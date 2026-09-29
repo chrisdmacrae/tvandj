@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import { View } from 'react-native';
 import { colors, focus, radii, spacing } from '../tokens';
 import { Focusable, type FocusableProps } from './Focusable';
@@ -10,6 +11,8 @@ export type ScrubBarProps = Omit<FocusableProps, 'children' | 'style'> & {
   playing: boolean;
   /** Shown above the knob while scrubbing, e.g. "◀◀ 2s/s". */
   label?: string;
+  /** A frame from the scrub position (e.g. a trickplay thumbnail), shown above the knob with the label. */
+  preview?: ReactNode;
 };
 
 const KNOB = 28;
@@ -47,7 +50,7 @@ function PauseGlyph({ color }: { color: string }) {
  * shows play/pause state. The bar only renders state; the player decides what
  * OK and Left/Right do while it has focus.
  */
-export function ScrubBar({ value, playing, label, ...rest }: ScrubBarProps) {
+export function ScrubBar({ value, playing, label, preview, ...rest }: ScrubBarProps) {
   const clamped = Math.min(1, Math.max(0, value));
   return (
     <Focusable accessibilityRole="adjustable" focusScale={1} style={{ paddingVertical: spacing.sm }} {...rest}>
@@ -87,16 +90,23 @@ export function ScrubBar({ value, playing, label, ...rest }: ScrubBarProps) {
                 {playing ? <PauseGlyph color={glyphColor} /> : <PlayGlyph color={glyphColor} />}
               </View>
             </View>
-            {label ? (
+            {label || preview ? (
               <View
                 style={{
                   position: 'absolute',
                   left: `${clamped * 100}%`,
                   bottom: KNOB + spacing.md,
+                  alignItems: 'center',
+                  gap: spacing.xs,
                   transform: [{ translateX: '-50%' }],
                 }}
               >
-                <Text
+                {preview ? (
+                  <View style={{ borderRadius: radii.md, overflow: 'hidden', borderWidth: 2, borderColor: colors.textPrimary, backgroundColor: colors.surface }}>
+                    {preview}
+                  </View>
+                ) : null}
+                {label ? <Text
                   variant="label"
                   style={{
                     paddingHorizontal: spacing.sm,
@@ -108,7 +118,7 @@ export function ScrubBar({ value, playing, label, ...rest }: ScrubBarProps) {
                   }}
                 >
                   {label}
-                </Text>
+                </Text> : null}
               </View>
             ) : null}
           </View>

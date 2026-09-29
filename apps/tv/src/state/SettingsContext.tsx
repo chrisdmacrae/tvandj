@@ -15,11 +15,18 @@ export type Settings = {
     codecs: Codec[];
     languages: Language[];
   };
+  playback: {
+    /** Jump over intros and recaps without asking. */
+    autoSkipIntro: boolean;
+    /** Count down into the next episode when one ends. */
+    autoplayNext: boolean;
+  };
 };
 
 export const DEFAULT_SETTINGS: Settings = {
   downloadarrUrl: null,
   request: { qualities: ['1080p'], codecs: ['h264', 'hevc'], languages: ['english'] },
+  playback: { autoSkipIntro: false, autoplayNext: true },
 };
 
 type SettingsState = {
@@ -39,7 +46,12 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
       .then((raw) => {
         if (!raw) return;
         const stored = JSON.parse(raw) as Partial<Settings>;
-        setSettings({ ...DEFAULT_SETTINGS, ...stored, request: { ...DEFAULT_SETTINGS.request, ...stored.request } });
+        setSettings({
+          ...DEFAULT_SETTINGS,
+          ...stored,
+          request: { ...DEFAULT_SETTINGS.request, ...stored.request },
+          playback: { ...DEFAULT_SETTINGS.playback, ...stored.playback },
+        });
       })
       .catch(() => {})
       .finally(() => setReady(true));

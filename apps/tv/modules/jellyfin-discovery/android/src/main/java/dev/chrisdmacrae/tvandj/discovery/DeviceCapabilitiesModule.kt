@@ -1,5 +1,8 @@
 package dev.chrisdmacrae.tvandj.discovery
 
+import android.content.IntentFilter
+import android.media.AudioFormat
+import android.media.AudioManager
 import android.media.MediaCodecInfo.CodecProfileLevel
 import android.media.MediaCodecList
 import expo.modules.kotlin.modules.Module
@@ -14,6 +17,8 @@ import expo.modules.kotlin.modules.ModuleDefinition
 class DeviceCapabilitiesModule : Module() {
   override fun definition() = ModuleDefinition {
     Name("DeviceCapabilities")
+
+    Function("audioCodecs") { audioCodecs() }
 
     Function("videoDecoders") {
       val codecs = MediaCodecList(MediaCodecList.REGULAR_CODECS).codecInfos.filter { !it.isEncoder }
@@ -38,6 +43,35 @@ class DeviceCapabilitiesModule : Module() {
         "av1" to decoders("video/av01").isNotEmpty(),
         "h264High10" to hasProfile("video/avc", CodecProfileLevel.AVCProfileHigh10),
       )
+    }
+  }
+
+  /**
+   * Audio formats the player can handle: decoded on the device, or passed
+   * through over HDMI to a receiver/TV that decodes it (how most Fire TVs play
+   * Dolby). Jellyfin converts anything else to AAC.
+   */
+  private fun audioCodecs(): List<String> {
+    val codecs = MediaCodecList(MediaCodecList.REGULAR_CODECS).codecInfos.filter { !it.isEncoder }
+    fun decodes(mime: String) = codecs.any { info -> info.supportedTypes.any { it.equals(mime, ignoreCase = true) } }
+
+    val context = appContext.reactContext
+    val hdmi = context?.registerReceiver(null, IntentFilter(AudioManager.ACTION_HDMI_AUDIO_PLUG))
+    val passthrough = hdmi
+      ?.takeIf { it.getIntExtra(AudioManager.EXTRA_AUDIO_PLUG_STATE, 0) == 1 }
+      ?.getIntArrayExtra(AudioManager.EXTRA_ENCODINGS)
+      ?.toSet()
+      .orEmpty()
+
+    return buildList {
+      add("aac")
+      add("mp3")
+      if (decodes("audio/ac3") || AudioFormat.ENCODING_AC3 in passthrough) add("ac3")
+      if (decodes("audio/eac3") || AudioFormat.ENCODING_E_AC3 in passthrough) add("eac3")
+      if (decodes("audio/vnd.dts") || AudioFormat.ENCODING_DTS in passthrough) add("dts")
+      if (decodes("audio/true-hd") || AudioFormat.ENCODING_DOLBY_TRUEHD in passthrough) add("truehd")
+      if (decodes("audio/opus")) add("opus")
+      if (decodes("audio/flac")) add("flac")
     }
   }
 

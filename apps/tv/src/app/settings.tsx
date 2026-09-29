@@ -151,6 +151,21 @@ export default function SettingsScreen() {
             </View>
           </Section>
 
+          <Section title="Playback">
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm }}>
+              <SelectChip
+                label="Skip intros and recaps automatically"
+                selected={settings.playback.autoSkipIntro}
+                onPress={() => update({ playback: { ...settings.playback, autoSkipIntro: !settings.playback.autoSkipIntro } })}
+              />
+              <SelectChip
+                label="Play the next episode automatically"
+                selected={settings.playback.autoplayNext}
+                onPress={() => update({ playback: { ...settings.playback, autoplayNext: !settings.playback.autoplayNext } })}
+              />
+            </View>
+          </Section>
+
           <Section
             title="downloadarr"
             description="Optional. Connect downloadarr to discover new movies and shows, request them, and follow their downloads."

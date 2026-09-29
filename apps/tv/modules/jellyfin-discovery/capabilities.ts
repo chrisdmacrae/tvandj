@@ -11,7 +11,7 @@ export type VideoDecoders = {
   h264High10: boolean;
 };
 
-const native = requireOptionalNativeModule<{ videoDecoders(): VideoDecoders }>('DeviceCapabilities');
+const native = requireOptionalNativeModule<{ videoDecoders(): VideoDecoders; audioCodecs?(): string[] }>('DeviceCapabilities');
 
 /**
  * Where the native module isn't available (web, or an old build), assume only
@@ -31,4 +31,16 @@ let cached: VideoDecoders | undefined;
 export function videoDecoders(): VideoDecoders {
   cached ??= native?.videoDecoders() ?? CONSERVATIVE;
   return cached;
+}
+
+let cachedAudio: string[] | undefined;
+
+/**
+ * Audio codecs (Jellyfin names) the device plays, by decoding or HDMI
+ * passthrough. Without the native module (web, or a build from before this
+ * was added), only AAC and MP3, so the server converts everything else.
+ */
+export function audioCodecs(): string[] {
+  cachedAudio ??= native?.audioCodecs?.() ?? ['aac', 'mp3'];
+  return cachedAudio;
 }

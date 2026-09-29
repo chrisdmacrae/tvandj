@@ -1,7 +1,9 @@
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import { TVFocusGuideView, View } from 'react-native';
 import Svg, { Defs, LinearGradient, Rect, Stop } from 'react-native-svg';
 import { ArrowLeftIcon, Button, IconButton, ScrubBar, Text, colors, safeArea, spacing } from '@tv-and-j/design-system';
+import { TracksPanel } from './TracksPanel';
+import { TrickplayPreview } from './TrickplayPreview';
 import type { Playback } from './usePlayback';
 import { useRemoteKeys } from './useRemoteKeys';
 import type { Scrubber } from './useScrubber';
@@ -27,6 +29,11 @@ type PlayerControlsProps = {
   onInteract: () => void;
   /** Leave the player. */
   onBack: () => void;
+  /** A contextual button beside the title, e.g. Skip intro or Next episode. */
+  action?: ReactNode;
+  /** The audio & subtitles panel is open (it replaces the transport controls). */
+  tracksOpen: boolean;
+  onOpenTracks: () => void;
 };
 
 /**
@@ -34,8 +41,8 @@ type PlayerControlsProps = {
  * buttons can't steal D-pad focus. The timeline takes focus each time they
  * show: OK plays/pauses, Left/Right drive a continuous scrub.
  */
-export function PlayerControls({ playback, scrubber, title, subtitle, onInteract, onBack }: PlayerControlsProps) {
-  const { currentTime, duration, isPlaying, volume, subtitleTracks, subtitleTrack } = playback;
+export function PlayerControls({ playback, scrubber, title, subtitle, onInteract, onBack, action, tracksOpen, onOpenTracks }: PlayerControlsProps) {
+  const { currentTime, duration, isPlaying, volume, stream } = playback;
   const [scrubFocused, setScrubFocused] = useState(false);
 
   useRemoteKeys((event) => {
@@ -50,11 +57,9 @@ export function PlayerControls({ playback, scrubber, title, subtitle, onInteract
   };
 
   const shownTime = scrubber.position ?? currentTime;
-  const subtitleLabel = !subtitleTracks.length
-    ? 'No subtitles'
-    : subtitleTrack
-      ? `CC: ${subtitleTrack.label || subtitleTrack.language || 'On'}`
-      : 'CC: Off';
+  const hasTrackChoice = !!stream && !stream.isAudio && (stream.audio.length > 1 || stream.subtitles.length > 0);
+  const subtitleOn = stream?.subtitles.find((t) => t.index === stream.subtitleIndex);
+  const tracksLabel = subtitleOn ? `Audio & subtitles · ${subtitleOn.label}` : 'Audio & subtitles';
 
   return (
     <>
@@ -74,6 +79,22 @@ export function PlayerControls({ playback, scrubber, title, subtitle, onInteract
         </View>
       </View>
 
+      {tracksOpen && stream ? (
+        <TracksPanel
+          stream={stream}
+          switching={playback.switching}
+          onSelectAudio={(index) => {
+            playback.selectAudio(index);
+            onInteract();
+          }}
+          onSelectSubtitle={(index) => {
+            playback.selectSubtitle(index);
+            onInteract();
+          }}
+        />
+      ) : null}
+
+      {tracksOpen ? null : (
       <View style={{ position: 'absolute', left: 0, right: 0, bottom: 0 }}>
         <Svg style={{ position: 'absolute', left: 0, right: 0, top: 0, bottom: 0 }} width="100%" height="100%">
           <Defs>
@@ -87,15 +108,18 @@ export function PlayerControls({ playback, scrubber, title, subtitle, onInteract
         </Svg>
 
         <View style={{ paddingHorizontal: safeArea.horizontal, paddingTop: spacing.xxxl, paddingBottom: safeArea.vertical, gap: spacing.sm }}>
-          <View>
-            <Text variant="title" numberOfLines={1}>
-              {title}
-            </Text>
-            {subtitle ? (
-              <Text variant="caption" tone="secondary" numberOfLines={1}>
-                {subtitle}
+          <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: spacing.lg }}>
+            <View style={{ flex: 1 }}>
+              <Text variant="title" numberOfLines={1}>
+                {title}
               </Text>
-            ) : null}
+              {subtitle ? (
+                <Text variant="caption" tone="secondary" numberOfLines={1}>
+                  {subtitle}
+                </Text>
+              ) : null}
+            </View>
+            {action}
           </View>
 
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md }}>
@@ -108,6 +132,9 @@ export function PlayerControls({ playback, scrubber, title, subtitle, onInteract
                 value={duration ? shownTime / duration : 0}
                 playing={isPlaying && !scrubber.scrubbing}
                 label={scrubber.label}
+                preview={
+                  scrubber.scrubbing && stream?.trickplay ? <TrickplayPreview trickplay={stream.trickplay} seconds={shownTime} /> : undefined
+                }
                 hasTVPreferredFocus
                 accessibilityLabel={`Timeline, ${isPlaying ? 'playing' : 'paused'}. OK to play or pause, left or right to scrub.`}
                 onFocus={() => {
@@ -128,9 +155,7 @@ export function PlayerControls({ playback, scrubber, title, subtitle, onInteract
           </View>
 
           <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.sm }}>
-            {playback.isAudio ? null : (
-              <Button size="sm" variant="ghost" label={subtitleLabel} onPress={act(playback.cycleSubtitles)} />
-            )}
+            {hasTrackChoice ? <Button size="sm" variant="ghost" label={tracksLabel} onPress={act(onOpenTracks)} /> : null}
             <Button size="sm" variant="ghost" label="Vol −" onPress={act(playback.volumeDown)} />
             <Text variant="caption" tone="secondary" style={{ minWidth: 40, textAlign: 'center' }}>
               {Math.round(volume * 100)}%
@@ -139,6 +164,7 @@ export function PlayerControls({ playback, scrubber, title, subtitle, onInteract
           </View>
         </View>
       </View>
+      )}
     </>
   );
 }

@@ -192,6 +192,30 @@ function episodeSubtitle(e: BaseItemDto) {
 export const SEASONS_HEIGHT = 250;
 
 /**
+ * SeasonBrowser as a block in a scrolling page, below a summary. Its top edge
+ * fades in over the artwork behind; below that it's solid, so it covers the
+ * artwork as it scrolls up.
+ */
+export function SeasonsBlock({ opacity, ...props }: SeasonBrowserProps & { opacity?: Animated.Value | Animated.AnimatedInterpolation<number> }) {
+  return (
+    <Animated.View style={{ opacity: opacity ?? 1 }}>
+      <Svg width="100%" height={spacing.xxxl}>
+        <Defs>
+          <LinearGradient id="seasons-block-scrim" x1="0" y1="0" x2="0" y2="1">
+            <Stop offset="0" stopColor={colors.canvas} stopOpacity={0} />
+            <Stop offset="1" stopColor={colors.canvas} stopOpacity={1} />
+          </LinearGradient>
+        </Defs>
+        <Rect x="0" y="0" width="100%" height="100%" fill="url(#seasons-block-scrim)" />
+      </Svg>
+      <View style={{ backgroundColor: colors.canvas, paddingBottom: safeArea.vertical }}>
+        <SeasonBrowser {...props} />
+      </View>
+    </Animated.View>
+  );
+}
+
+/**
  * SeasonBrowser pinned along the bottom of a summary screen, over a gradient
  * so it reads on top of artwork. Screens reserve SEASONS_HEIGHT above it.
  */
