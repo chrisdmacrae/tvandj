@@ -1,0 +1,20 @@
+-- Merging decision tree log ---
+manifest
+ADDED from /Users/chrisdmacrae/Developer/code/chrisdmacrae/tv-and-j/apps/tv/modules/jellyfin-discovery/android/src/main/AndroidManifest.xml:1:1-4:12
+INJECTED from /Users/chrisdmacrae/Developer/code/chrisdmacrae/tv-and-j/apps/tv/modules/jellyfin-discovery/android/src/main/AndroidManifest.xml:1:1-4:12
+	package
+		INJECTED from /Users/chrisdmacrae/Developer/code/chrisdmacrae/tv-and-j/apps/tv/modules/jellyfin-discovery/android/src/main/AndroidManifest.xml
+	xmlns:android
+		ADDED from /Users/chrisdmacrae/Developer/code/chrisdmacrae/tv-and-j/apps/tv/modules/jellyfin-discovery/android/src/main/AndroidManifest.xml:1:11-69
+uses-permission#android.permission.CHANGE_WIFI_MULTICAST_STATE
+ADDED from /Users/chrisdmacrae/Developer/code/chrisdmacrae/tv-and-j/apps/tv/modules/jellyfin-discovery/android/src/main/AndroidManifest.xml:3:3-84
+	android:name
+		ADDED from /Users/chrisdmacrae/Developer/code/chrisdmacrae/tv-and-j/apps/tv/modules/jellyfin-discovery/android/src/main/AndroidManifest.xml:3:20-81
+uses-sdk
+INJECTED from /Users/chrisdmacrae/Developer/code/chrisdmacrae/tv-and-j/apps/tv/modules/jellyfin-discovery/android/src/main/AndroidManifest.xml reason: use-sdk injection requested
+INJECTED from /Users/chrisdmacrae/Developer/code/chrisdmacrae/tv-and-j/apps/tv/modules/jellyfin-discovery/android/src/main/AndroidManifest.xml
+INJECTED from /Users/chrisdmacrae/Developer/code/chrisdmacrae/tv-and-j/apps/tv/modules/jellyfin-discovery/android/src/main/AndroidManifest.xml
+	android:targetSdkVersion
+		INJECTED from /Users/chrisdmacrae/Developer/code/chrisdmacrae/tv-and-j/apps/tv/modules/jellyfin-discovery/android/src/main/AndroidManifest.xml
+	android:minSdkVersion
+		INJECTED from /Users/chrisdmacrae/Developer/code/chrisdmacrae/tv-and-j/apps/tv/modules/jellyfin-discovery/android/src/main/AndroidManifest.xml

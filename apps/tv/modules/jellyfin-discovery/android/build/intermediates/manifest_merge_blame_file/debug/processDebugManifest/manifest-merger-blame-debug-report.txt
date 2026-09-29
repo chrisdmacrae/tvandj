@@ -1,0 +1,11 @@
+1<?xml version="1.0" encoding="utf-8"?>
+2<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+3    package="dev.chrisdmacrae.tvandj.discovery" >
+4
+5    <uses-sdk android:minSdkVersion="24" />
+6    <!-- Some Wi-Fi drivers drop broadcast replies unless a multicast lock is held. -->
+7    <uses-permission android:name="android.permission.CHANGE_WIFI_MULTICAST_STATE" />
+7-->/Users/chrisdmacrae/Developer/code/chrisdmacrae/tv-and-j/apps/tv/modules/jellyfin-discovery/android/src/main/AndroidManifest.xml:3:3-84
+7-->/Users/chrisdmacrae/Developer/code/chrisdmacrae/tv-and-j/apps/tv/modules/jellyfin-discovery/android/src/main/AndroidManifest.xml:3:20-81
+8
+9</manifest>

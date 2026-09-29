@@ -1,0 +1,27 @@
+<!-- @dsCard group="Spacing" -->
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Spacing, radii & safe area</title><link rel="stylesheet" href="../components.css"></head>
+<body><div class="preview">
+<style>.sp{display:flex;align-items:center;gap:12px}.sp i{display:block;height:16px;background:var(--color-accent)}
+.safe{transform:scale(.5);transform-origin:top left;margin-bottom:-270px}.safe .inner{height:100%;outline:1px dashed var(--color-accent);display:flex;align-items:center;justify-content:center}</style>
+<div>
+<h2 class="t-title" style="margin-bottom:8px">Spacing (dp)</h2>
+<div class="sp t-caption"><i style="width:var(--space-xxs)"></i>xxs 2</div>
+<div class="sp t-caption"><i style="width:var(--space-xs)"></i>xs 4</div>
+<div class="sp t-caption"><i style="width:var(--space-sm)"></i>sm 8</div>
+<div class="sp t-caption"><i style="width:var(--space-md)"></i>md 12</div>
+<div class="sp t-caption"><i style="width:var(--space-lg)"></i>lg 16</div>
+<div class="sp t-caption"><i style="width:var(--space-xl)"></i>xl 24</div>
+<div class="sp t-caption"><i style="width:var(--space-xxl)"></i>xxl 32</div>
+<div class="sp t-caption"><i style="width:var(--space-xxxl)"></i>xxxl 48</div>
+</div>
+<div class="row t-caption">
+<div style="width:64px;height:48px;background:var(--color-surface-raised);border-radius:var(--radius-sm)"></div>sm 4
+<div style="width:64px;height:48px;background:var(--color-surface-raised);border-radius:var(--radius-md)"></div>md 8
+<div style="width:64px;height:48px;background:var(--color-surface-raised);border-radius:var(--radius-lg)"></div>lg 12
+<div style="width:64px;height:48px;background:var(--color-surface-raised);border-radius:var(--radius-pill)"></div>pill
+</div>
+<div><h2 class="t-title" style="margin-bottom:8px">960×540 canvas, title-safe insets 48 / 27 (shown at 50%)</h2>
+<div class="tv-frame safe" style="background:var(--color-surface)"><div class="inner t-headline tone-secondary">Title-safe area</div></div></div>
+</div></body></html>

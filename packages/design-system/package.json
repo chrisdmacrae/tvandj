@@ -1,0 +1,22 @@
+{
+  "name": "@tv-and-j/design-system",
+  "version": "0.1.0",
+  "private": true,
+  "description": "10-foot UI design system for the TV and J Jellyfin client (React Native tvOS / Fire TV).",
+  "main": "src/index.ts",
+  "types": "src/index.ts",
+  "react-native": "src/index.ts",
+  "files": [
+    "src",
+    "design"
+  ],
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "build:css": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/build-css.mts"
+  },
+  "peerDependencies": {
+    "react": "*",
+    "react-native": "*",
+    "react-native-svg": "*"
+  }
+}

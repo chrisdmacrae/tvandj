@@ -1,0 +1,15 @@
+{
+  "name": "tv-and-j",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "tv": "npm run start -w @tv-and-j/tv",
+    "android:tv": "npm run android -w @tv-and-j/tv",
+    "prebuild:tv": "npm run prebuild:tv -w @tv-and-j/tv",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "design:preview": "npx --yes serve packages/design-system/design"
+  }
+}
