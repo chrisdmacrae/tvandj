@@ -1,0 +1,291 @@
+#!/usr/bin/env node
+// A stand-in for downloadarr's API (github.com/chrisdmacrae/downloadarr) for
+// developing TV and J's optional downloadarr integration without a real
+// indexer or torrent client.
+//
+//   node scripts/dev-downloadarr.mjs     # needs scripts/dev-server.sh running
+//
+// - Serves the same routes and { success, data } shapes TV and J uses, on :3001.
+// - Titles and posters come from TMDB via the dev Jellyfin's remote search.
+// - Requests walk PENDING → SEARCHING → DOWNLOADING (0–100% over ~30s) →
+//   COMPLETED, then drop a generated video into the dev Jellyfin library so
+//   the app can be seen waiting for Jellyfin to index it before offering Play.
+// - Answers "who is Downloadarr?" on udp/7360 like the real LAN discovery.
+import { execFile } from 'node:child_process';
+import dgram from 'node:dgram';
+import { readFileSync } from 'node:fs';
+import http from 'node:http';
+import { promisify } from 'node:util';
+
+const PORT = 3001;
+const JELLYFIN = 'http://localhost:8096';
+const CONTAINER = 'tvandj-jellyfin';
+const DOCKER = process.env.DOCKER ?? 'podman';
+const run = promisify(execFile);
+
+const DEV_PASSWORD = readFileSync(new URL('./dev-server.sh', import.meta.url), 'utf8').match(/^DEV_PASSWORD=(\S+)/m)?.[1];
+const AUTH = 'MediaBrowser Client="dev-downloadarr", Device="script", DeviceId="dev-downloadarr", Version="1"';
+
+async function jellyfin(path, body) {
+  const res = await fetch(`${JELLYFIN}${path}`, {
+    method: body ? 'POST' : 'GET',
+    headers: { 'Content-Type': 'application/json', Authorization: `${AUTH}, Token="${token}"` },
+    body: body ? JSON.stringify(body) : undefined,
+  });
+  return res.status === 204 ? null : res.json();
+}
+
+let token = '';
+async function signIn() {
+  const res = await fetch(`${JELLYFIN}/Users/AuthenticateByName`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: AUTH },
+    body: JSON.stringify({ Username: 'dev', Pw: DEV_PASSWORD }),
+  });
+  token = (await res.json()).AccessToken;
+}
+
+// ---- catalogue ---------------------------------------------------------------
+
+const GENRES = {
+  movie: [
+    { id: 16, name: 'Animation' },
+    { id: 878, name: 'Science Fiction' },
+    { id: 14, name: 'Fantasy' },
+    { id: 35, name: 'Comedy' },
+  ],
+  tv: [
+    { id: 18, name: 'Drama' },
+    { id: 10765, name: 'Sci-Fi & Fantasy' },
+  ],
+};
+
+const SEED = {
+  movie: [
+    ['Elephants Dream', 2006, [16, 878]],
+    ['Tears of Steel', 2012, [878]],
+    ['Cosmos Laundromat', 2015, [16, 14]],
+    ['Spring', 2019, [16, 14]],
+    ['Sprite Fright', 2021, [16, 35]],
+    ['Sintel', 2010, [16, 14]],
+    ['Big Buck Bunny', 2008, [16, 35]],
+  ],
+  tv: [
+    ['Severance', 2022, [18, 10765]],
+    ['Andor', 2022, [18, 10765]],
+    ['Shōgun', 2024, [18]],
+    ['Pioneer One', 2010, [18, 10765]],
+  ],
+};
+
+const catalogue = { movie: [], tv: [] };
+
+async function loadCatalogue() {
+  for (const kind of ['movie', 'tv']) {
+    for (const [name, year, genreIds] of SEED[kind]) {
+      const [hit] = await jellyfin(`/Items/RemoteSearch/${kind === 'movie' ? 'Movie' : 'Series'}`, {
+        SearchInfo: { Name: name, Year: year },
+      });
+      if (!hit?.ProviderIds?.Tmdb) continue;
+      const genres = GENRES[kind].filter((g) => genreIds.includes(g.id)).map((g) => g.name);
+      catalogue[kind].push({
+        id: hit.ProviderIds.Tmdb,
+        title: hit.Name,
+        year: hit.ProductionYear,
+        poster: hit.ImageUrl?.replace('/original/', '/w500/'),
+        overview: hit.Overview,
+        type: kind,
+        rating: 6 + ((Number(hit.ProviderIds.Tmdb) % 30) / 10),
+        genres,
+        genreIds,
+        ...(kind === 'tv' ? { seasons: 1 } : { runtime: 90 + (Number(hit.ProviderIds.Tmdb) % 60) }),
+      });
+    }
+  }
+  console.log(`catalogue: ${catalogue.movie.length} movies, ${catalogue.tv.length} shows`);
+}
+
+const publicItem = ({ genreIds, ...item }) => item;
+
+// ---- requests ----------------------------------------------------------------
+
+const requests = [];
+const SEARCH_AFTER_MS = 3_000;
+const DOWNLOAD_AFTER_MS = 8_000;
+const DOWNLOAD_MS = 30_000;
+
+function progressOf(r) {
+  const elapsed = Date.now() - r.startedAt - DOWNLOAD_AFTER_MS;
+  return Math.max(0, Math.min(100, (elapsed / DOWNLOAD_MS) * 100));
+}
+
+function tick() {
+  for (const r of requests) {
+    // Like real downloadarr: an ongoing show's request sits at PENDING between search
+    // passes while its season torrents download. Progress lives in /seasons.
+    if (r.contentType === 'TV_SHOW' && r.isOngoing) continue;
+    const age = Date.now() - r.startedAt;
+    const before = r.status;
+    if (r.status === 'PENDING' && age > SEARCH_AFTER_MS) r.status = 'SEARCHING';
+    if (r.status === 'SEARCHING' && age > DOWNLOAD_AFTER_MS) {
+      r.status = 'DOWNLOADING';
+      r.foundTorrentTitle = `${r.title} (${r.year}) 1080p WEB-DL x265`;
+    }
+    if (r.status === 'DOWNLOADING' && progressOf(r) >= 100) {
+      r.status = 'COMPLETED';
+      r.completedAt = new Date().toISOString();
+      organize(r);
+    }
+    if (before !== r.status) {
+      r.updatedAt = new Date().toISOString();
+      console.log(`${r.title}: ${before} → ${r.status}`);
+    }
+  }
+}
+
+/** "Move into the library": generate a short video where Jellyfin will find it, then rescan. */
+async function organize(r) {
+  const folder =
+    r.contentType === 'MOVIE'
+      ? `/media/movies/${r.title} (${r.year})`
+      : `/media/shows/${r.title} (${r.year})/Season 01`;
+  const file = r.contentType === 'MOVIE' ? `${r.title} (${r.year}).mp4` : `${r.title} - S01E01.mkv`;
+  const ff = `/usr/lib/jellyfin-ffmpeg/ffmpeg -loglevel error -y -f lavfi -i testsrc2=size=1280x720:rate=24 -f lavfi -i sine=frequency=500:sample_rate=48000 -t 120 -c:v libx264 -preset ultrafast -pix_fmt yuv420p -c:a aac -shortest`;
+  try {
+    await run(DOCKER, ['exec', CONTAINER, 'sh', '-c', `mkdir -p "${folder}" && ${ff} "${folder}/${file}"`]);
+    await jellyfin('/Library/Refresh', {});
+    console.log(`${r.title}: organized into ${folder}; Jellyfin rescanning`);
+  } catch (e) {
+    console.error(`${r.title}: organize failed`, e.message);
+  }
+}
+
+// ---- HTTP --------------------------------------------------------------------
+
+const ok = (data, extra = {}) => ({ status: 200, body: { success: true, data, ...extra } });
+const fail = (status, error) => ({ status, body: { success: false, error } });
+
+async function route(method, url, body) {
+  const path = url.pathname;
+  let m;
+
+  if ((m = path.match(/^\/(movies|tv-shows)\/(popular|genres\/list|genres\/(\d+)|(\d+))$/)) && method === 'GET') {
+    const kind = m[1] === 'movies' ? 'movie' : 'tv';
+    if (m[2] === 'popular') return ok(catalogue[kind].map(publicItem));
+    if (m[2] === 'genres/list') return ok(GENRES[kind]);
+    if (m[3]) return ok(catalogue[kind].filter((i) => i.genreIds.includes(Number(m[3]))).map(publicItem));
+    const item = catalogue[kind].find((i) => i.id === m[4]);
+    if (!item) return fail(404, 'Not found');
+    return ok({ ...publicItem(item), tmdbId: Number(item.id), genre: item.genres, actors: 'A. Performer, B. Actor' });
+  }
+
+  if ((m = path.match(/^\/(movies|tv-shows)\/search$/)) && method === 'GET') {
+    const kind = m[1] === 'movies' ? 'movie' : 'tv';
+    const q = (url.searchParams.get('query') ?? '').toLowerCase();
+    return ok(catalogue[kind].filter((i) => i.title.toLowerCase().includes(q)).map(publicItem));
+  }
+
+  if (path === '/torrent-requests' && method === 'GET') {
+    const limit = Number(url.searchParams.get('limit') ?? 20);
+    const offset = Number(url.searchParams.get('offset') ?? 0);
+    const page = requests.slice(offset, offset + limit).map(({ startedAt, ...r }) => r);
+    return ok(page, { pagination: { total: requests.length, limit, offset, hasMore: offset + limit < requests.length } });
+  }
+
+  if ((m = path.match(/^\/torrent-requests\/(movies|tv-shows)$/)) && method === 'POST') {
+    const contentType = m[1] === 'movies' ? 'MOVIE' : 'TV_SHOW';
+    const dupe = requests.find((r) => r.contentType === contentType && r.tmdbId === body.tmdbId && r.status !== 'CANCELLED');
+    if (dupe) return fail(409, 'This title has already been requested');
+    const now = new Date().toISOString();
+    const request = {
+      id: `req_${requests.length + 1}`,
+      contentType,
+      ...body,
+      status: 'PENDING',
+      searchAttempts: 0,
+      createdAt: now,
+      updatedAt: now,
+      startedAt: Date.now(),
+    };
+    requests.push(request);
+    console.log(`requested ${body.title}`, JSON.stringify({ q: body.preferredQualities, f: body.preferredFormats, l: body.preferredLanguages }));
+    const { startedAt, ...shown } = request;
+    return { status: 201, body: { success: true, data: shown } };
+  }
+
+  if ((m = path.match(/^\/torrent-requests\/([^/]+)\/download-status$/)) && method === 'GET') {
+    const r = requests.find((x) => x.id === m[1]);
+    if (!r) return fail(404, 'Not found');
+    const progress = r.status === 'COMPLETED' ? 100 : r.status === 'DOWNLOADING' ? progressOf(r) : 0;
+    const left = Math.max(0, Math.round((DOWNLOAD_MS * (1 - progress / 100)) / 1000));
+    return ok({
+      requestId: r.id,
+      status: r.status,
+      progress,
+      downloadSpeed: r.status === 'DOWNLOADING' ? '12.4 MB/s' : '0 B/s',
+      eta: r.status === 'DOWNLOADING' ? `${left}s` : '0',
+      totalSize: 0,
+      completedSize: 0,
+      files: [],
+      torrentDownloads: [],
+    });
+  }
+
+  // An ongoing show mid-way: S1 partly delivered (E1 done, E2 downloading, E3 searching), S2 not found yet.
+  if ((m = path.match(/^\/torrent-requests\/([^/]+)\/seasons$/)) && method === 'GET') {
+    const r = requests.find((x) => x.id === m[1]);
+    if (!r || r.contentType !== 'TV_SHOW') return fail(404, 'Not found');
+    const progress = progressOf(r);
+    const done = progress >= 100;
+    const episode = (n, status) => ({ id: `${r.id}-s1e${n}`, episodeNumber: n, title: `Episode ${n}`, status });
+    return ok([
+      {
+        id: `${r.id}-s1`,
+        seasonNumber: 1,
+        totalEpisodes: 3,
+        // Season status DOWNLOADING also means "partly complete" in downloadarr; episode 2 stays PENDING
+        // while its season pack downloads, which is what used to leave the app saying "Requested".
+        status: 'DOWNLOADING',
+        episodes: [episode(1, 'COMPLETED'), episode(2, done ? 'COMPLETED' : 'PENDING'), episode(3, 'SEARCHING')],
+        torrentDownloads: [{ status: done ? 'COMPLETED' : 'DOWNLOADING', downloadProgress: progress }],
+      },
+      { id: `${r.id}-s2`, seasonNumber: 2, totalEpisodes: 8, status: 'SEARCHING', episodes: [] },
+    ]);
+  }
+
+  if ((m = path.match(/^\/torrent-requests\/([^/]+)\/search$/)) && method === 'POST') {
+    const r = requests.find((x) => x.id === m[1]);
+    if (!r) return fail(404, 'Not found');
+    Object.assign(r, { status: 'PENDING', startedAt: Date.now(), updatedAt: new Date().toISOString() });
+    return ok(r);
+  }
+
+  return fail(404, `No mock for ${method} ${path}`);
+}
+
+http
+  .createServer(async (req, res) => {
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Accept');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+    if (req.method === 'OPTIONS') return res.end();
+    let raw = '';
+    for await (const chunk of req) raw += chunk;
+    const url = new URL(req.url, `http://localhost:${PORT}`);
+    const { status, body } = await route(req.method, url, raw ? JSON.parse(raw) : {});
+    res.writeHead(status, { 'Content-Type': 'application/json' }).end(JSON.stringify(body));
+  })
+  .listen(PORT, async () => {
+    await signIn();
+    await loadCatalogue();
+    setInterval(tick, 1000);
+    console.log(`mock downloadarr on http://localhost:${PORT} (emulator: http://10.0.2.2:${PORT})`);
+  });
+
+dgram
+  .createSocket({ type: 'udp4', reuseAddr: true })
+  .on('message', function (msg, from) {
+    if (msg.toString().trim().toLowerCase() !== 'who is downloadarr?') return;
+    this.send(JSON.stringify({ Id: 'dev', Name: 'Downloadarr', Version: 'dev', Port: PORT }), from.port, from.address);
+  })
+  .bind(7360);

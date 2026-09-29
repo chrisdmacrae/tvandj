@@ -14,6 +14,7 @@ NAME=tvandj-jellyfin
 PORT=8096
 DEV_USER=dev
 DEV_PASSWORD=tvandj-dev # test-only credentials for this local container
+GUEST_PASSWORD=tvandj-guest # second test user, to exercise the user switcher
 URL="http://localhost:$PORT"
 DOCKER=${DOCKER:-$(command -v podman || command -v docker)}
 
@@ -62,6 +63,17 @@ echo "allowing resume on short clips…"
 # Jellyfin only keeps a resume point for items over 5 minutes by default; the sample clips are shorter.
 json GET /System/Configuration | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{const c=JSON.parse(s);c.MinResumeDurationSeconds=30;process.stdout.write(JSON.stringify(c))})' > /tmp/tvandj-config.json
 json POST /System/Configuration "$(cat /tmp/tvandj-config.json)"
+
+echo "adding test users…"
+# Kids: no password (switches instantly). Guest: password (gets a prompt). Both listed on the sign-in screen.
+add_user() {
+  local id
+  id=$(json POST /Users/New "{\"Name\":\"$1\",\"Password\":\"$2\"}" | sed -E 's/.*"Id":"([^"]+)".*/\1/')
+  json GET "/Users/$id" | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{const p=JSON.parse(s).Policy;p.IsHidden=false;process.stdout.write(JSON.stringify(p))})' > /tmp/tvandj-policy.json
+  json POST "/Users/$id/Policy" "$(cat /tmp/tvandj-policy.json)"
+}
+add_user Kids ""
+add_user Guest "$GUEST_PASSWORD"
 
 echo "creating libraries…"
 lib() { json POST "/Library/VirtualFolders?name=$1&collectionType=$2&paths=$3&refreshLibrary=false" '{"LibraryOptions":{}}'; }

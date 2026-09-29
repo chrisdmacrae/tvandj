@@ -35,7 +35,8 @@
         }
       ],
       "expo-video",
-      "expo-secure-store"
+      "expo-secure-store",
+      "expo-image"
     ],
     "android": {
       "package": "dev.chrisdmacrae.tvandj"

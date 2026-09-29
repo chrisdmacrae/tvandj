@@ -1,53 +1,89 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { Api, Jellyfin } from '@jellyfin/sdk';
-import { createContext, use, useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { createContext, use, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { getJellyfin } from '../jellyfin/sdk';
 import type { ServerInfo } from '../jellyfin/servers';
 import { secureStorage } from './secureStorage';
 
 const SERVER_KEY = 'tv-and-j/server';
-const AUTH_KEY = 'tv-and-j.auth'; // SecureStore keys allow only [A-Za-z0-9._-]
+// SecureStore keys allow only [A-Za-z0-9._-]
+const ACCOUNTS_KEY = 'tv-and-j.accounts';
+const LEGACY_AUTH_KEY = 'tv-and-j.auth'; // single sign-in, before user switching
 
 export type Auth = { userId: string; userName: string; accessToken: string };
+
+type Stored = { current: string | null; accounts: Auth[] };
 
 type SessionState = {
   /** false until storage has been read. */
   ready: boolean;
   server: ServerInfo | null;
+  /** The user browsing right now. */
   auth: Auth | null;
+  /** Everyone who has signed in on this device, so switching back needs no password. */
+  accounts: Auth[];
   jellyfin: Jellyfin | null;
-  /** Authenticated API client; null until signed in. */
+  /** Authenticated API client for the current user; null until signed in. */
   api: Api | null;
   saveServer: (server: ServerInfo) => Promise<void>;
+  /** Save a user's session and make them current. */
   signIn: (auth: Auth) => Promise<void>;
+  /** Switch to a user who has already signed in here. */
+  switchUser: (userId: string) => Promise<void>;
+  /** Forget the current user; falls back to another saved user, or to sign-in. */
   signOut: () => Promise<void>;
-  /** Forget the server entirely and restart onboarding. */
+  /** Forget the server and every user, and restart onboarding. */
   forgetServer: () => Promise<void>;
 };
 
 const SessionContext = createContext<SessionState | null>(null);
 
+async function persist(stored: Stored) {
+  await secureStorage.set(ACCOUNTS_KEY, JSON.stringify(stored));
+}
+
 export function SessionProvider({ children }: { children: ReactNode }) {
   const [ready, setReady] = useState(false);
   const [jellyfin, setJellyfin] = useState<Jellyfin | null>(null);
   const [server, setServer] = useState<ServerInfo | null>(null);
-  const [auth, setAuth] = useState<Auth | null>(null);
+  const [stored, setStored] = useState<Stored>({ current: null, accounts: [] });
 
   useEffect(() => {
     (async () => {
       try {
-        const [jf, rawServer, rawAuth] = await Promise.all([
+        const [jf, rawServer, rawAccounts, rawLegacy] = await Promise.all([
           getJellyfin(),
           AsyncStorage.getItem(SERVER_KEY),
-          secureStorage.get(AUTH_KEY),
+          secureStorage.get(ACCOUNTS_KEY),
+          secureStorage.get(LEGACY_AUTH_KEY),
         ]);
         setJellyfin(jf);
         setServer(rawServer ? JSON.parse(rawServer) : null);
-        setAuth(rawServer && rawAuth ? JSON.parse(rawAuth) : null);
+        if (!rawServer) return;
+        if (rawAccounts) {
+          setStored(JSON.parse(rawAccounts));
+        } else if (rawLegacy) {
+          // Carry an existing single sign-in over to the multi-user store.
+          const legacy = JSON.parse(rawLegacy) as Auth;
+          const migrated = { current: legacy.userId, accounts: [legacy] };
+          await persist(migrated);
+          await secureStorage.remove(LEGACY_AUTH_KEY);
+          setStored(migrated);
+        }
       } finally {
         setReady(true);
       }
     })();
+  }, []);
+
+  // Latest value for computing updates; React state updaters aren't guaranteed to run synchronously.
+  const storedRef = useRef(stored);
+  storedRef.current = stored;
+  const update = useCallback(async (next: (prev: Stored) => Stored) => {
+    const result = next(storedRef.current);
+    storedRef.current = result;
+    setStored(result);
+    await persist(result);
   }, []);
 
   const saveServer = useCallback(async (next: ServerInfo) => {
@@ -55,30 +91,44 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     setServer(next);
   }, []);
 
-  const signIn = useCallback(async (next: Auth) => {
-    await secureStorage.set(AUTH_KEY, JSON.stringify(next));
-    setAuth(next);
-  }, []);
+  const signIn = useCallback(
+    (next: Auth) =>
+      update((prev) => ({
+        current: next.userId,
+        accounts: [...prev.accounts.filter((a) => a.userId !== next.userId), next],
+      })),
+    [update],
+  );
 
-  const signOut = useCallback(async () => {
-    await secureStorage.remove(AUTH_KEY);
-    setAuth(null);
-  }, []);
+  const switchUser = useCallback(
+    (userId: string) => update((prev) => (prev.accounts.some((a) => a.userId === userId) ? { ...prev, current: userId } : prev)),
+    [update],
+  );
+
+  const signOut = useCallback(
+    () =>
+      update((prev) => {
+        const accounts = prev.accounts.filter((a) => a.userId !== prev.current);
+        return { current: accounts[0]?.userId ?? null, accounts };
+      }),
+    [update],
+  );
 
   const forgetServer = useCallback(async () => {
-    await Promise.all([secureStorage.remove(AUTH_KEY), AsyncStorage.removeItem(SERVER_KEY)]);
-    setAuth(null);
+    await Promise.all([secureStorage.remove(ACCOUNTS_KEY), AsyncStorage.removeItem(SERVER_KEY)]);
+    setStored({ current: null, accounts: [] });
     setServer(null);
   }, []);
 
+  const auth = useMemo(() => stored.accounts.find((a) => a.userId === stored.current) ?? null, [stored]);
   const api = useMemo(
     () => (jellyfin && server && auth ? jellyfin.createApi(server.address, auth.accessToken) : null),
     [jellyfin, server, auth],
   );
 
   const value = useMemo(
-    () => ({ ready, server, auth, jellyfin, api, saveServer, signIn, signOut, forgetServer }),
-    [ready, server, auth, jellyfin, api, saveServer, signIn, signOut, forgetServer],
+    () => ({ ready, server, auth, accounts: stored.accounts, jellyfin, api, saveServer, signIn, switchUser, signOut, forgetServer }),
+    [ready, server, auth, stored.accounts, jellyfin, api, saveServer, signIn, switchUser, signOut, forgetServer],
   );
   return <SessionContext value={value}>{children}</SessionContext>;
 }

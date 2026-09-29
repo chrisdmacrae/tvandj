@@ -2,10 +2,14 @@ import type { BaseItemDto } from '@jellyfin/sdk/lib/generated-client/models';
 import { router, useLocalSearchParams } from 'expo-router';
 import { VideoView } from 'expo-video';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Animated, BackHandler, Image, Platform, Pressable, View, useWindowDimensions } from 'react-native';
+import { Image } from 'expo-image';
+import { ActivityIndicator, Animated, BackHandler, Platform, Pressable, View, useWindowDimensions } from 'react-native';
 import Svg, { Defs, LinearGradient, Rect, Stop } from 'react-native-svg';
-import { ArrowLeftIcon, Button, Chip, IconButton, Text, colors, safeArea, spacing } from '@tv-and-j/design-system';
+import { ArrowLeftIcon, Button, Chip, DownloadBar, IconButton, Text, colors, safeArea, spacing } from '@tv-and-j/design-system';
 import { backdropUrl, logoUrl, posterUrl } from '../../jellyfin/images';
+import { downloadDisplay } from '../../components/DiscoverCard';
+import { SEASONS_HEIGHT, SeasonsSection } from '../../components/SeasonBrowser';
+import { useActiveDownload } from '../../downloadarr/hooks';
 import { useItem, usePlayQueue } from '../../jellyfin/library';
 import { useRatings } from '../../jellyfin/ratings';
 import { PlayerControls, formatTime } from '../../player/PlayerControls';
@@ -37,13 +41,23 @@ function episodeLine(item: BaseItemDto) {
 }
 
 export default function ItemScreen() {
-  const { id } = useLocalSearchParams<{ id: string }>();
+  // autoplay: arriving from Play on a just-downloaded title, so skip straight to the player.
+  const { id, autoplay } = useLocalSearchParams<{ id: string; autoplay?: string }>();
   const { api } = useAuthedSession();
-  const { width } = useWindowDimensions();
+  const { width, height: screenHeight } = useWindowDimensions();
   const item = useItem(id).data;
   const queue = usePlayQueue(item).data;
   const playback = usePlayback(queue);
   const ratings = useRatings(item);
+  // downloadarr activity for this title, e.g. more seasons of a show on the way.
+  const download = downloadDisplay(
+    useActiveDownload(
+      item?.Type === 'Series' ? 'tv' : 'movie',
+      item?.Type === 'Series' || item?.Type === 'Movie' ? (item.ProviderIds?.Tmdb ?? undefined) : undefined,
+    ),
+  );
+  const downloadStatus =
+    download.status && item?.Type === 'Series' ? `New episodes · ${download.status.toLowerCase()}` : download.status;
   // Stable callbacks; `playback` itself is a new object every time-update render.
   const { start, togglePlay } = playback;
   const scrubber = useScrubber(playback);
@@ -53,6 +67,9 @@ export default function ItemScreen() {
 
   const [phase, setPhase] = useState<Phase>('summary');
   const [controlsVisible, setControlsVisible] = useState(false);
+  // Set once the viewer moves into the season/episode browser: hold the preview, don't go full screen.
+  const [browsing, setBrowsing] = useState(false);
+  const startBrowsing = useCallback(() => setBrowsing(true), []);
   const controlsShown = useRef(false);
   controlsShown.current = controlsVisible;
 
@@ -94,9 +111,13 @@ export default function ItemScreen() {
   const ready = !!item && !!playback.stream;
   useEffect(() => {
     if (!ready || phase !== 'summary') return;
+    if (autoplay) {
+      setPhase('player');
+      return;
+    }
     const timer = setTimeout(() => setPhase('preview'), art ? ART_HOLD_MS : 0);
     return () => clearTimeout(timer);
-  }, [ready, phase, art]);
+  }, [ready, phase, art, autoplay]);
 
   useEffect(() => {
     if (phase !== 'preview') return;
@@ -106,10 +127,10 @@ export default function ItemScreen() {
 
   // Separate from the effect above so a changing `start` never resets the countdown.
   useEffect(() => {
-    if (phase !== 'preview') return;
+    if (phase !== 'preview' || browsing) return;
     const timer = setTimeout(() => setPhase('player'), PREVIEW_MS);
     return () => clearTimeout(timer);
-  }, [phase]);
+  }, [phase, browsing]);
 
   useEffect(() => {
     if (phase !== 'player') return;
@@ -202,6 +223,13 @@ export default function ItemScreen() {
   const nowPlaying = playback.current;
   const actors = (item.People ?? []).filter((p) => p.Type === 'Actor').slice(0, 4).map((p) => p.Name);
   const artists = item.AlbumArtist ?? item.Artists?.join(', ');
+  // Shows get a season/episode browser along the bottom, so the summary moves up and tightens.
+  const isSeries = item.Type === 'Series';
+  const playEpisode = (episodeId: string) => {
+    setBrowsing(true);
+    playback.pause();
+    router.push({ pathname: '/item/[id]', params: { id: episodeId, autoplay: '1' } });
+  };
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.canvas }}>
@@ -209,8 +237,10 @@ export default function ItemScreen() {
       <Animated.View style={{ position: 'absolute', top: 0, bottom: 0, right: 0, left: mediaLeft, overflow: 'hidden' }}>
         {art ? (
           <Image
-            source={{ uri: art }}
-            resizeMode={isAlbum ? 'contain' : 'cover'}
+            source={art}
+            contentFit={isAlbum ? 'contain' : 'cover'}
+            cachePolicy="memory-disk"
+            transition={200}
             style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}
           />
         ) : null}
@@ -244,12 +274,14 @@ export default function ItemScreen() {
         pointerEvents={phase === 'player' ? 'none' : 'auto'}
         style={{
           width: panelWidth,
-          height: '100%',
-          justifyContent: 'center',
+          height: isSeries ? screenHeight - SEASONS_HEIGHT : '100%',
+          justifyContent: isSeries ? 'flex-end' : 'center',
           paddingLeft: safeArea.horizontal,
           paddingRight: spacing.lg,
-          paddingVertical: safeArea.vertical,
-          gap: spacing.md,
+          // Shows: content starts below the Back button so a tall summary can't run into it.
+          paddingTop: isSeries ? safeArea.vertical + 48 : safeArea.vertical,
+          paddingBottom: isSeries ? spacing.sm : safeArea.vertical,
+          gap: isSeries ? spacing.sm : spacing.md,
           opacity: panelOpacity,
         }}
       >
@@ -260,7 +292,7 @@ export default function ItemScreen() {
           </View>
         ) : null}
         {logo ? (
-          <Image source={{ uri: logo }} resizeMode="contain" style={{ width: '100%', height: 72, alignSelf: 'flex-start' }} accessibilityLabel={title} />
+          <Image source={logo} contentFit="contain" contentPosition="left" cachePolicy="memory-disk" style={{ width: '100%', height: isSeries ? 52 : 72 }} accessibilityLabel={title} />
         ) : (
           <Text variant="headline" numberOfLines={2}>
             {title}
@@ -281,19 +313,19 @@ export default function ItemScreen() {
           {isAlbum && item.ChildCount ? <Chip label={`${item.ChildCount} tracks`} /> : null}
         </View>
 
-        {item.Genres?.length ? (
+        {item.Genres?.length && !isSeries ? (
           <Text variant="caption" tone="secondary" numberOfLines={1}>
             {item.Genres.slice(0, 3).join(' · ')}
           </Text>
         ) : null}
 
         {item.Overview ? (
-          <Text variant="body" tone="secondary" numberOfLines={7}>
+          <Text variant="body" tone="secondary" numberOfLines={isSeries ? 2 : 7}>
             {item.Overview}
           </Text>
         ) : null}
 
-        {actors.length ? (
+        {actors.length && !isSeries ? (
           <Text variant="caption" tone="tertiary" numberOfLines={2}>
             Starring {actors.join(', ')}
           </Text>
@@ -303,6 +335,15 @@ export default function ItemScreen() {
           <Text variant="caption" style={{ color: colors.danger }}>
             {playback.error}
           </Text>
+        ) : null}
+
+        {downloadStatus ? (
+          <View style={{ gap: spacing.xs }}>
+            <Text variant="caption" numberOfLines={1} style={{ color: colors.highlight }}>
+              {downloadStatus}
+            </Text>
+            <DownloadBar progress={download.download ?? undefined} />
+          </View>
         ) : null}
 
         {phase !== 'player' ? (
@@ -317,6 +358,16 @@ export default function ItemScreen() {
           </View>
         ) : null}
       </Animated.View>
+
+      {isSeries && phase !== 'player' ? (
+        <SeasonsSection
+          opacity={panelOpacity}
+          series={item}
+          initialSeason={queue?.[0]?.ParentIndexNumber ?? undefined}
+          onPlayEpisode={playEpisode}
+          onFocus={startBrowsing}
+        />
+      ) : null}
 
       {phase === 'player' && playback.isAudio ? (
         <View style={{ position: 'absolute', left: safeArea.horizontal, top: safeArea.vertical }}>

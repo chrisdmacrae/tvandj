@@ -9,7 +9,7 @@ function url(api: Api, itemId: string, type: ImageType, tag: string | undefined,
 }
 
 /** Poster-shaped art: the item's own Primary, falling back to its series/album. */
-export function posterUrl(api: Api, item: BaseItemDto, maxWidth = 360): string | undefined {
+export function posterUrl(api: Api, item: BaseItemDto, maxWidth = 300): string | undefined {
   if (item.ImageTags?.Primary && item.Id) return url(api, item.Id, 'Primary', item.ImageTags.Primary, maxWidth);
   if (item.SeriesId && item.SeriesPrimaryImageTag) return url(api, item.SeriesId, 'Primary', item.SeriesPrimaryImageTag, maxWidth);
   if (item.AlbumId && item.AlbumPrimaryImageTag) return url(api, item.AlbumId, 'Primary', item.AlbumPrimaryImageTag, maxWidth);
@@ -17,7 +17,7 @@ export function posterUrl(api: Api, item: BaseItemDto, maxWidth = 360): string |
 }
 
 /** 16:9 art for landscape cards: Thumb, then Backdrop, then an episode's own still. */
-export function landscapeUrl(api: Api, item: BaseItemDto, maxWidth = 640): string | undefined {
+export function landscapeUrl(api: Api, item: BaseItemDto, maxWidth = 480): string | undefined {
   if (item.Id && item.ImageTags?.Thumb) return url(api, item.Id, 'Thumb', item.ImageTags.Thumb, maxWidth);
   if (item.Type === 'Episode' && item.Id && item.ImageTags?.Primary) {
     return url(api, item.Id, 'Primary', item.ImageTags.Primary, maxWidth);

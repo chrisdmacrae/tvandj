@@ -1,6 +1,9 @@
 {
   "platforms": ["android"],
   "android": {
-    "modules": ["dev.chrisdmacrae.tvandj.discovery.JellyfinDiscoveryModule"]
+    "modules": [
+      "dev.chrisdmacrae.tvandj.discovery.JellyfinDiscoveryModule",
+      "dev.chrisdmacrae.tvandj.discovery.DeviceCapabilitiesModule"
+    ]
   }
 }

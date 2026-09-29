@@ -1,9 +1,12 @@
 import type { BaseItemDto, BaseItemKind, ItemFields } from '@jellyfin/sdk/lib/generated-client/models';
-import { getLibraryApi, getShowApi, getUserViewApi } from '@jellyfin/sdk/lib/utils/api';
+import { getGenreApi, getLibraryApi, getShowApi, getUserViewApi } from '@jellyfin/sdk/lib/utils/api';
+import type { Api } from '@jellyfin/sdk';
 import { useQuery } from '@tanstack/react-query';
+import { useCallback } from 'react';
 import { useAuthedSession } from '../state/SessionContext';
 
-const CARD_FIELDS: ItemFields[] = ['PrimaryImageAspectRatio', 'Overview'];
+// ProviderIds lets cards match downloadarr requests by TMDB id.
+const CARD_FIELDS: ItemFields[] = ['PrimaryImageAspectRatio', 'Overview', 'ProviderIds'];
 const ROW_LIMIT = 24;
 
 export type LibraryKind = 'movies' | 'tvshows' | 'music';
@@ -102,6 +105,171 @@ export function usePlayQueue(item: BaseItemDto | undefined) {
         return data.Items ?? [];
       }
       return [item];
+    },
+  });
+}
+
+/**
+ * Movies and series in Jellyfin keyed by `movie:<tmdbId>` / `tv:<tmdbId>`, so
+ * discovery results (TMDB ids) can tell whether a title is already playable.
+ * One lightweight request: ids and provider ids only.
+ */
+type LibraryIndex = Record<string, string>;
+
+function libraryIndexQuery(api: Api, userId: string, refetchInterval: number | false) {
+  return {
+    queryKey: ['libraryIndex', userId],
+    staleTime: 60_000,
+    refetchInterval,
+    // A plain record (not a Map) so structural sharing keeps it stable between refetches.
+    queryFn: async (): Promise<LibraryIndex> => {
+      const { data } = await getLibraryApi(api).getItems({
+        userId,
+        recursive: true,
+        includeItemTypes: ['Movie', 'Series'],
+        fields: ['ProviderIds'],
+        enableImages: false,
+        enableUserData: false,
+      });
+      const index: LibraryIndex = {};
+      for (const item of data.Items ?? []) {
+        const tmdb = item.ProviderIds?.Tmdb;
+        if (tmdb && item.Id) index[`${item.Type === 'Series' ? 'tv' : 'movie'}:${tmdb}`] = item.Id;
+      }
+      return index;
+    },
+  };
+}
+
+export function useLibraryIndex(refetchInterval: number | false = false) {
+  const { api, auth } = useAuthedSession();
+  return useQuery(libraryIndexQuery(api, auth.userId, refetchInterval));
+}
+
+/** The Jellyfin id for one TMDB title, subscribing to just that entry. */
+export function useJellyfinId(kind: 'movie' | 'tv', tmdbId: string | number | undefined, refetchInterval: number | false = false) {
+  const { api, auth } = useAuthedSession();
+  const key = tmdbId == null ? undefined : `${kind}:${tmdbId}`;
+  return useQuery({
+    ...libraryIndexQuery(api, auth.userId, refetchInterval),
+    select: useCallback((index: LibraryIndex) => (key ? index[key] : undefined), [key]),
+  }).data;
+}
+
+/** Library genres for the Movies/TV tabs when downloadarr isn't connected. */
+export function useLibraryGenres(kind: 'movie' | 'tv') {
+  const { api, auth } = useAuthedSession();
+  return useQuery({
+    queryKey: ['libraryGenres', kind, auth.userId],
+    queryFn: async () => {
+      const { data } = await getGenreApi(api).getGenres({
+        userId: auth.userId,
+        includeItemTypes: [kind === 'movie' ? 'Movie' : 'Series'],
+        sortBy: ['SortName'],
+      });
+      return (data.Items ?? []).map((g) => g.Name).filter((n): n is string => !!n);
+    },
+  });
+}
+
+export function useLibraryByGenre(kind: 'movie' | 'tv', genre: string) {
+  const { api, auth } = useAuthedSession();
+  return useQuery({
+    queryKey: ['libraryGenre', kind, genre, auth.userId],
+    queryFn: async () => {
+      const { data } = await getLibraryApi(api).getItems({
+        userId: auth.userId,
+        recursive: true,
+        genres: [genre],
+        includeItemTypes: [kind === 'movie' ? 'Movie' : 'Series'],
+        sortBy: ['DateCreated'],
+        sortOrder: ['Descending'],
+        limit: ROW_LIMIT,
+        fields: CARD_FIELDS,
+      });
+      return data.Items ?? [];
+    },
+  });
+}
+
+export function useSeasons(seriesId: string | undefined) {
+  const { api, auth } = useAuthedSession();
+  return useQuery({
+    queryKey: ['seasons', seriesId, auth.userId],
+    enabled: !!seriesId,
+    queryFn: async () => {
+      const { data } = await getShowApi(api).getSeasons({ seriesId: seriesId!, userId: auth.userId });
+      return data.Items ?? [];
+    },
+  });
+}
+
+export function useEpisodes(seriesId: string | undefined, seasonId: string | undefined) {
+  const { api, auth } = useAuthedSession();
+  return useQuery({
+    queryKey: ['episodes', seriesId, seasonId, auth.userId],
+    enabled: !!seriesId && !!seasonId,
+    queryFn: async () => {
+      const { data } = await getShowApi(api).getEpisodes({
+        seriesId: seriesId!,
+        seasonId,
+        userId: auth.userId,
+        fields: ['Overview', 'PrimaryImageAspectRatio'],
+      });
+      return data.Items ?? [];
+    },
+  });
+}
+
+/** Library titles matching a search, for the search screen. */
+export function useLibrarySearch(kind: 'movie' | 'tv', query: string) {
+  const { api, auth } = useAuthedSession();
+  const q = query.trim();
+  return useQuery({
+    queryKey: ['librarySearch', kind, q, auth.userId],
+    enabled: q.length >= 2,
+    staleTime: 60_000,
+    queryFn: async () => {
+      const { data } = await getLibraryApi(api).getItems({
+        userId: auth.userId,
+        recursive: true,
+        searchTerm: q,
+        includeItemTypes: [kind === 'movie' ? 'Movie' : 'Series'],
+        limit: ROW_LIMIT,
+        fields: CARD_FIELDS,
+      });
+      return data.Items ?? [];
+    },
+  });
+}
+
+const normalize = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, '');
+
+/**
+ * The Jellyfin series for a TMDB show. Tries the TMDB id first, then title +
+ * year: Jellyfin sometimes matches a show via TVDB only, leaving no TMDB id.
+ */
+export function useJellyfinSeries(tmdbId: string | undefined, title: string | undefined, year: number | undefined) {
+  const { api, auth } = useAuthedSession();
+  const index = useLibraryIndex();
+  const byTmdb = tmdbId ? index.data?.[`tv:${tmdbId}`] : undefined;
+  return useQuery({
+    queryKey: ['jellyfinSeries', tmdbId, title, year, byTmdb, auth.userId],
+    enabled: !!byTmdb || !!title,
+    refetchInterval: 30_000, // a partly delivered show may appear in Jellyfin at any moment
+    queryFn: async () => {
+      const library = getLibraryApi(api);
+      if (byTmdb) return (await library.getItem({ itemId: byTmdb, userId: auth.userId })).data;
+      const { data } = await library.getItems({
+        userId: auth.userId,
+        recursive: true,
+        searchTerm: title,
+        includeItemTypes: ['Series'],
+        fields: ['ProviderIds'],
+        limit: 10,
+      });
+      const matches = (data.Items ?? []).filter((s) => normalize(s.Name ?? '') === normalize(title!));
+      return matches.find((s) => !year || !s.ProductionYear || Math.abs(s.ProductionYear - year) <= 1) ?? null;
     },
   });
 }

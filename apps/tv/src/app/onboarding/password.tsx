@@ -1,3 +1,4 @@
+import { useLocalSearchParams } from 'expo-router';
 import { useRef, useState } from 'react';
 import type { TextInput } from 'react-native';
 import { Button, TextField } from '@tv-and-j/design-system';
@@ -7,7 +8,9 @@ import { useSession } from '../../state/SessionContext';
 
 export default function PasswordSignIn() {
   const { jellyfin, server, signIn } = useSession();
-  const [username, setUsername] = useState('');
+  // Arriving from a user picked on the sign-in step: their name is filled in, focus goes to the password.
+  const params = useLocalSearchParams<{ username?: string }>();
+  const [username, setUsername] = useState(params.username ?? '');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string>();
   const [busy, setBusy] = useState(false);
@@ -37,7 +40,7 @@ export default function PasswordSignIn() {
         label="Username"
         value={username}
         onChangeText={setUsername}
-        autoFocus
+        autoFocus={!params.username}
         autoCapitalize="none"
         autoCorrect={false}
         returnKeyType="next"
@@ -49,6 +52,8 @@ export default function PasswordSignIn() {
         value={password}
         onChangeText={setPassword}
         error={error}
+        autoFocus={!!params.username}
+        hint={params.username ? `Leave blank if ${params.username} doesn’t have a password.` : undefined}
         secureTextEntry
         autoCapitalize="none"
         autoCorrect={false}

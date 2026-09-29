@@ -43,3 +43,24 @@ key in `apps/tv/.env`:
 ```sh
 EXPO_PUBLIC_OMDB_API_KEY=your-key
 ```
+
+## downloadarr (optional)
+
+TV and J works with Jellyfin alone. Connecting [downloadarr](https://github.com/chrisdmacrae/downloadarr)
+in **Settings** adds:
+
+- **New for you** on Home, and discovery rows by genre on the Movies and TV tabs
+- a **Request** button for titles not in Jellyfin, using the quality, codec and language chosen in Settings
+- live download progress on cards and summary pages, then **Play** once Jellyfin has indexed the file
+
+Settings finds downloadarr automatically: it listens for downloadarr's LAN broadcast (udp/7360,
+downloadarr ≥ the `feat: answer LAN discovery broadcasts` commit) and falls back to checking the Jellyfin
+host on ports 3001 and 3000/api.
+
+For development without a real indexer or torrent client:
+
+```sh
+node scripts/dev-downloadarr.mjs   # mock API on :3001 (emulator: 10.0.2.2:3001); needs scripts/dev-server.sh
+```
+
+Requests to the mock "download" over ~40s, then drop a generated video into the dev Jellyfin library.

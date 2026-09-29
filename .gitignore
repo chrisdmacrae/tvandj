@@ -26,3 +26,7 @@ expo-env.d.ts
 # local env (API keys)
 .env
 .env*.local
+
+# Gradle output of local Expo modules
+apps/*/modules/*/android/build/
+apps/*/modules/*/android/.cxx/

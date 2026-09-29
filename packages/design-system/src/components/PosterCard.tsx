@@ -1,6 +1,8 @@
-import { Image, View } from 'react-native';
+import { Image } from 'expo-image';
+import { View } from 'react-native';
 import { artwork, colors, focus, radii, spacing, type ArtworkShape } from '../tokens';
 import { Badge } from './Badge';
+import { DownloadBar } from './DownloadBar';
 import { Focusable, type FocusableProps } from './Focusable';
 import { ProgressBar } from './ProgressBar';
 import { Text } from './Text';
@@ -15,6 +17,13 @@ export type PosterCardProps = Omit<FocusableProps, 'children' | 'style'> & {
   /** Top-right badge, e.g. unplayed episode count. */
   badge?: string;
   watched?: boolean;
+  /**
+   * Shown instead of the playback progress bar while the item is being
+   * fetched: a 0–1 fraction, or null for indeterminate (searching, indexing).
+   */
+  download?: number | null;
+  /** Short status line under the title, e.g. "Downloading 42%". Replaces the subtitle. */
+  status?: string;
 };
 
 export function PosterCard({
@@ -25,6 +34,8 @@ export function PosterCard({
   progress,
   badge,
   watched,
+  download,
+  status,
   ...rest
 }: PosterCardProps) {
   const { width, aspectRatio } = artwork[shape];
@@ -46,7 +57,15 @@ export function PosterCard({
             }}
           >
             {imageUri ? (
-              <Image source={{ uri: imageUri }} style={{ width: '100%', height: '100%' }} />
+              // expo-image: memory + disk cache, decodes at the displayed size, and recycles as rows scroll.
+              <Image
+                source={imageUri}
+                recyclingKey={imageUri}
+                cachePolicy="memory-disk"
+                contentFit="cover"
+                transition={120}
+                style={{ width: '100%', height: '100%' }}
+              />
             ) : (
               <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: spacing.sm }}>
                 <Text variant="label" tone="tertiary" numberOfLines={2} style={{ textAlign: 'center' }}>
@@ -61,7 +80,12 @@ export function PosterCard({
                 style={{ position: 'absolute', top: spacing.xs, right: spacing.xs }}
               />
             ) : null}
-            {progress ? (
+            {download !== undefined ? (
+              <DownloadBar
+                progress={download ?? undefined}
+                style={{ position: 'absolute', left: spacing.xs, right: spacing.xs, bottom: spacing.xs }}
+              />
+            ) : progress ? (
               <ProgressBar
                 value={progress}
                 style={{ position: 'absolute', left: spacing.xs, right: spacing.xs, bottom: spacing.xs }}
@@ -72,9 +96,14 @@ export function PosterCard({
             <Text variant="label" numberOfLines={1}>
               {title}
             </Text>
-            {subtitle ? (
-              <Text variant="caption" tone="secondary" numberOfLines={1}>
-                {subtitle}
+            {status || subtitle ? (
+              <Text
+                variant="caption"
+                tone={status ? 'primary' : 'secondary'}
+                numberOfLines={1}
+                style={status ? { color: colors.highlight } : undefined}
+              >
+                {status ?? subtitle}
               </Text>
             ) : null}
           </View>

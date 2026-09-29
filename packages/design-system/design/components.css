@@ -219,3 +219,74 @@ body {
 }
 .ds-icon-button svg { width: 20px; height: 20px; }
 .ds-icon-button.is-focused { background: var(--color-text-primary); color: var(--color-text-inverse); transform: scale(1.1); }
+
+/* DownloadBar — something still arriving: "live" highlight colour plus a moving shimmer.
+   Omit the width (.is-indeterminate) while searching or waiting to be indexed. */
+.ds-download { position: relative; height: 4px; border-radius: var(--radius-pill); background: var(--color-border); overflow: hidden; }
+.ds-download > span { position: relative; display: block; height: 100%; overflow: hidden; background: var(--color-highlight); }
+.ds-download > span::after {
+  content: ""; position: absolute; inset: 0; width: 40%;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,.7), transparent);
+  animation: ds-download-sweep 1.4s ease-in-out infinite;
+}
+.ds-download.is-indeterminate > span { width: 100%; opacity: .35; }
+.ds-download.is-indeterminate > span::after { background: linear-gradient(90deg, transparent, #fff, transparent); }
+@keyframes ds-download-sweep { from { transform: translateX(-100%); } to { transform: translateX(250%); } }
+@media (prefers-reduced-motion: reduce) { .ds-download > span::after { animation: none; } }
+.ds-poster__art .ds-download { position: absolute; left: var(--space-xs); right: var(--space-xs); bottom: var(--space-xs); }
+.ds-poster__status { color: var(--color-highlight); }
+
+/* TabBar — top-level navigation; selected is underlined, focused inverts */
+.ds-tabbar { display: flex; align-items: center; gap: var(--space-xs); padding: var(--safe-vertical) var(--safe-horizontal) var(--space-md); }
+.ds-tab {
+  display: flex; flex-direction: column; align-items: center; gap: var(--space-xxs);
+  padding: var(--space-sm) var(--space-lg); border-radius: var(--radius-pill);
+  font-size: var(--type-title-size); line-height: var(--type-title-line); font-weight: var(--type-title-weight);
+  color: var(--color-text-secondary);
+}
+.ds-tab::after { content: ""; width: 20px; height: 3px; border-radius: var(--radius-pill); background: transparent; }
+.ds-tab.is-selected { color: var(--color-text-primary); }
+.ds-tab.is-selected::after { background: var(--color-accent); }
+.ds-tab.is-focused { background: var(--color-text-primary); color: var(--color-text-inverse); transform: scale(1.05); }
+.ds-tab.is-focused::after { background: transparent; }
+.ds-tabbar__spacer { flex: 1; }
+
+/* SelectChip — multi-select option */
+.ds-select-chip {
+  display: inline-flex; align-items: center; gap: var(--space-sm);
+  padding: var(--space-sm) var(--space-md); border-radius: var(--radius-pill);
+  border: 1.5px solid var(--color-border); color: var(--color-text-primary);
+  font-size: var(--type-label-size); line-height: var(--type-label-line); font-weight: var(--type-label-weight);
+}
+.ds-select-chip::before { content: ""; width: 10px; height: 10px; border-radius: 50%; border: 2px solid var(--color-text-tertiary); }
+.ds-select-chip.is-selected { border-color: var(--color-accent); background: var(--color-accent-muted); }
+.ds-select-chip.is-selected::before { border-color: var(--color-accent); background: var(--color-accent); }
+.ds-select-chip.is-focused { background: var(--color-text-primary); color: var(--color-text-inverse); transform: scale(1.05); }
+.ds-select-chip.is-focused::before { border-color: var(--color-text-inverse); }
+.ds-select-chip.is-focused.is-selected::before { background: var(--color-text-inverse); }
+
+/* Dropdown — TV select: pill trigger (optional status detail) + focus-trapped list */
+.ds-dropdown {
+  display: inline-flex; align-items: center; gap: var(--space-sm);
+  padding: var(--space-sm) var(--space-lg); border-radius: var(--radius-pill);
+  background: var(--color-surface-raised); color: var(--color-text-primary);
+  font-size: var(--type-title-size); line-height: var(--type-title-line); font-weight: var(--type-title-weight);
+}
+.ds-dropdown__detail { font-size: var(--type-caption-size); font-weight: 400; color: var(--color-highlight); }
+.ds-dropdown::after { content: "⌄"; font-size: 16px; line-height: 1; margin-top: -6px; }
+.ds-dropdown.is-focused { background: var(--color-text-primary); color: var(--color-text-inverse); transform: scale(1.05); }
+.ds-dropdown.is-focused .ds-dropdown__detail { color: var(--color-text-inverse); }
+.ds-dropdown-menu { display: flex; flex-direction: column; gap: var(--space-sm); padding: var(--space-lg); border-radius: var(--radius-lg); background: var(--color-surface); min-width: 320px; }
+
+/* AmbientGlow — wash of the focused card's colour from the top edge; set --glow per card */
+.ds-ambient-glow {
+  position: absolute; inset: 0 0 40% 0; pointer-events: none; --glow: hsl(215, 70%, 55%);
+  background: radial-gradient(70% 100% at 50% 0, color-mix(in srgb, var(--glow) 55%, transparent), color-mix(in srgb, var(--glow) 18%, transparent) 45%, transparent 100%);
+  transition: background var(--motion-slow) ease-in-out;
+}
+
+/* Avatar — user picture, or initials on a colour derived from the name; AvatarButton adds a focus ring */
+.ds-avatar { display: inline-grid; place-items: center; width: 40px; height: 40px; border-radius: 50%; overflow: hidden; color: var(--color-text-inverse); font-weight: 700; font-size: var(--type-label-size); }
+.ds-avatar img { width: 100%; height: 100%; object-fit: cover; }
+.ds-avatar-button { display: inline-flex; padding: 1.5px; border-radius: 50%; border: var(--focus-ring-width) solid transparent; }
+.ds-avatar-button.is-focused { border-color: var(--color-focus-ring); transform: scale(1.1); }

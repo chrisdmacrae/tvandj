@@ -8,7 +8,7 @@ built on React Native tvOS. Dark-only, D-pad first.
 | Path | What |
 | --- | --- |
 | `src/tokens/index.ts` | **Source of truth** for color, spacing, type, radii, focus, motion, artwork sizes |
-| `src/components/` | React Native components (`Text`, `Focusable`, `Button`, `Badge`, `ProgressBar`, `PosterCard`, `Shelf`, `Screen`, `TextField`, `ListItem`, `Chip`, `GodRays`, `ScrubBar`, `IconButton`) |
+| `src/components/` | React Native components (`Text`, `Focusable`, `Button`, `Badge`, `ProgressBar`, `PosterCard`, `Shelf`, `Screen`, `TextField`, `ListItem`, `Chip`, `GodRays`, `ScrubBar`, `IconButton`, `DownloadBar`, `TabBar`, `SelectChip`, `Dropdown`, `AmbientGlow`, `Avatar`) |
 | `design/tokens.css` | Generated from `src/tokens` — `npm run build:css -w @tv-and-j/design-system` |
 | `design/components.css` | HTML/CSS mirrors of each RN component (`.ds-*` classes, `.is-focused` state) |
 | `design/**/*.html` | Preview cards for Claude Design, each tagged `<!-- @dsCard group="…" -->` |

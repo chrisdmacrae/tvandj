@@ -1,40 +1,88 @@
 import type { Api } from '@jellyfin/sdk';
-import type { BaseItemDto, DeviceProfile } from '@jellyfin/sdk/lib/generated-client/models';
+import type {
+  BaseItemDto,
+  CodecProfile,
+  DeviceProfile,
+  ProfileConditionValue,
+} from '@jellyfin/sdk/lib/generated-client/models';
 import { getMediaInfoApi, getSessionApi } from '@jellyfin/sdk/lib/utils/api';
+import { videoDecoders } from '../../modules/jellyfin-discovery/capabilities';
 
 const TICKS_PER_SECOND = 10_000_000;
 
 /**
- * What Fire TV's ExoPlayer handles. Video is always requested as HLS so the
- * server can deliver text subtitles as WebVTT renditions inside the stream;
- * expo-video can't side-load subtitle files. The server stream-copies video
- * and audio when the codecs already fit, so this is usually a cheap remux.
+ * What this device's player can handle, built from its actual hardware
+ * decoders. Jellyfin stream-copies video that fits (usually a cheap remux)
+ * and transcodes to H.264 anything that doesn't, e.g. 10-bit HEVC on a
+ * decoder that only does 8-bit, instead of sending a stream that won't play.
+ *
+ * Video is always requested as HLS so the server can deliver text subtitles
+ * as WebVTT renditions inside the stream; expo-video can't side-load them.
  */
-const DEVICE_PROFILE: DeviceProfile = {
-  Name: 'TV and J',
-  MaxStreamingBitrate: 120_000_000,
-  MaxStaticBitrate: 120_000_000,
-  MusicStreamingTranscodingBitrate: 320_000,
-  DirectPlayProfiles: [
-    { Type: 'Video', Container: 'mp4,m4v,mkv,webm', VideoCodec: 'h264,hevc,vp9,av1', AudioCodec: 'aac,mp3,ac3,eac3,opus,flac' },
-    { Type: 'Audio', Container: 'mp3,aac,m4a,flac,ogg,opus,wav' },
-  ],
-  TranscodingProfiles: [
-    {
-      Type: 'Video',
-      Container: 'ts',
-      Protocol: 'hls',
-      Context: 'Streaming',
-      VideoCodec: 'h264,hevc',
-      AudioCodec: 'aac,ac3,eac3,mp3',
-      MaxAudioChannels: '6',
-      MinSegments: 1,
-      BreakOnNonKeyFrames: true,
-    },
-    { Type: 'Audio', Container: 'mp3', Protocol: 'http', Context: 'Streaming', AudioCodec: 'mp3', MaxAudioChannels: '2' },
-  ],
-  SubtitleProfiles: ['vtt', 'srt', 'subrip', 'ass', 'ssa', 'webvtt', 'mov_text'].map((Format) => ({ Format, Method: 'Hls' as const })),
-};
+function deviceProfile(): DeviceProfile {
+  const d = videoDecoders();
+  const videoCodecs = ['h264', d.hevc && 'hevc', d.vp9 && 'vp9', d.av1 && 'av1'].filter(Boolean).join(',');
+  const lessOrEqual = (Property: ProfileConditionValue, Value: number) =>
+    ({ Condition: 'LessThanEqual', Property, Value: String(Value), IsRequired: false }) as const;
+
+  const codecProfiles: CodecProfile[] = [];
+  if (d.hevc) {
+    if (d.hevcMain10MaxLevel > 0) {
+      // Separate level limits for 8-bit and 10-bit streams.
+      codecProfiles.push(
+        {
+          Type: 'Video',
+          Codec: 'hevc',
+          ApplyConditions: [lessOrEqual('VideoBitDepth', 8)],
+          Conditions: [lessOrEqual('VideoLevel', d.hevcMainMaxLevel)],
+        },
+        {
+          Type: 'Video',
+          Codec: 'hevc',
+          ApplyConditions: [{ Condition: 'GreaterThanEqual', Property: 'VideoBitDepth', Value: '9', IsRequired: false }],
+          Conditions: [lessOrEqual('VideoLevel', d.hevcMain10MaxLevel), lessOrEqual('VideoBitDepth', 10)],
+        },
+      );
+    } else {
+      codecProfiles.push({
+        Type: 'Video',
+        Codec: 'hevc',
+        Conditions: [lessOrEqual('VideoBitDepth', 8), lessOrEqual('VideoLevel', d.hevcMainMaxLevel)],
+      });
+    }
+  }
+  if (!d.h264High10) {
+    codecProfiles.push({ Type: 'Video', Codec: 'h264', Conditions: [lessOrEqual('VideoBitDepth', 8)] });
+  }
+
+  return {
+    Name: 'TV and J',
+    MaxStreamingBitrate: 120_000_000,
+    MaxStaticBitrate: 120_000_000,
+    MusicStreamingTranscodingBitrate: 320_000,
+    DirectPlayProfiles: [
+      { Type: 'Video', Container: 'mp4,m4v,mkv,webm', VideoCodec: videoCodecs, AudioCodec: 'aac,mp3,ac3,eac3,opus,flac' },
+      { Type: 'Audio', Container: 'mp3,aac,m4a,flac,ogg,opus,wav' },
+    ],
+    TranscodingProfiles: [
+      {
+        Type: 'Video',
+        Container: 'ts',
+        Protocol: 'hls',
+        Context: 'Streaming',
+        // Listed codecs can be stream-copied; anything else is transcoded to the first, H.264.
+        VideoCodec: d.hevc ? 'h264,hevc' : 'h264',
+        AudioCodec: 'aac,ac3,eac3,mp3',
+        MaxAudioChannels: '6',
+        MinSegments: 1,
+        BreakOnNonKeyFrames: true,
+      },
+      { Type: 'Audio', Container: 'mp3', Protocol: 'http', Context: 'Streaming', AudioCodec: 'mp3', MaxAudioChannels: '2' },
+    ],
+    CodecProfiles: codecProfiles,
+    SubtitleProfiles: ['vtt', 'srt', 'subrip', 'ass', 'ssa', 'webvtt', 'mov_text'].map((Format) => ({ Format, Method: 'Hls' as const })),
+  };
+}
 
 export type Stream = {
   url: string;
@@ -58,7 +106,7 @@ export async function resolveStream(api: Api, userId: string, item: BaseItemDto)
     itemId: item.Id,
     playbackInfoDto: {
       UserId: userId,
-      DeviceProfile: DEVICE_PROFILE,
+      DeviceProfile: deviceProfile(),
       StartTimeTicks: startTicks,
       AutoOpenLiveStream: true,
       EnableDirectPlay: isAudio,

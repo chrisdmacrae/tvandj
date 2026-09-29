@@ -1,0 +1,240 @@
+/**
+ * Minimal client for downloadarr (github.com/chrisdmacrae/downloadarr), an
+ * optional companion service: TMDB-backed discovery plus torrent requests.
+ * It has no auth; every response is wrapped as { success, data, error }.
+ * Routes have no prefix on the API port (3001); behind its web UI they
+ * live under /api.
+ */
+import { discoverDownloadarr } from '../../modules/jellyfin-discovery';
+import type { Codec, Language, Quality, Settings } from '../state/SettingsContext';
+
+export type MediaKind = 'movie' | 'tv';
+
+export type DiscoverItem = {
+  id: string; // TMDB id
+  title: string;
+  year?: number;
+  poster?: string;
+  backdrop?: string;
+  overview?: string;
+  type: MediaKind | 'game';
+  rating?: number;
+  genres?: string[];
+  runtime?: number;
+  seasons?: number;
+};
+
+export type DiscoverDetails = DiscoverItem & {
+  tmdbId?: number;
+  imdbId?: string;
+  genre?: string[];
+  director?: string;
+  creator?: string;
+  actors?: string; // comma separated
+  plot?: string;
+  released?: string;
+  network?: string;
+  status?: string;
+  episodes?: number;
+};
+
+export type Genre = { id: number; name: string };
+
+export type RequestStatus = 'PENDING' | 'SEARCHING' | 'FOUND' | 'DOWNLOADING' | 'COMPLETED' | 'FAILED' | 'CANCELLED' | 'EXPIRED';
+
+export type TorrentRequest = {
+  id: string;
+  contentType: 'MOVIE' | 'TV_SHOW' | 'GAME';
+  title: string;
+  year?: number;
+  tmdbId?: number;
+  imdbId?: string;
+  status: RequestStatus;
+  isOngoing?: boolean;
+  posterUrl?: string;
+  backdropUrl?: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
+type PieceStatus = 'PENDING' | 'SEARCHING' | 'FOUND' | 'DOWNLOADING' | 'COMPLETED' | 'FAILED';
+
+export type RequestSeason = {
+  id: string;
+  seasonNumber: number;
+  totalEpisodes?: number;
+  status: PieceStatus;
+  episodes?: { id: string; episodeNumber: number; title?: string; status: PieceStatus }[];
+  torrentDownloads?: { status: string; downloadProgress?: number }[];
+};
+
+export type DownloadStatus = {
+  requestId: string;
+  status: RequestStatus;
+  progress: number; // 0–100
+  downloadSpeed: string;
+  eta: string;
+};
+
+export class DownloadarrError extends Error {
+  constructor(
+    message: string,
+    readonly status?: number,
+  ) {
+    super(message);
+  }
+}
+
+const paths = { movie: 'movies', tv: 'tv-shows' } as const;
+
+// downloadarr's filters are exact matches on what a release title says, so
+// "HEVC" and "x265" are different tags for the same codec: send both.
+const QUALITY: Record<Quality, string[]> = { '1080p': ['HD_1080P'], '4k': ['UHD_4K'] };
+const CODEC: Record<Codec, string[]> = { h264: ['X264'], hevc: ['HEVC', 'X265'] };
+const LANGUAGE: Record<Language, string> = {
+  english: 'ENGLISH',
+  french: 'FRENCH',
+  german: 'GERMAN',
+  spanish: 'SPANISH',
+  japanese: 'JAPANESE',
+};
+
+export function normalizeBaseUrl(input: string): string {
+  let url = input.trim().replace(/\/+$/, '');
+  if (!/^https?:\/\//i.test(url)) url = `http://${url}`;
+  // A bare host means the API port; downloadarr's UI (3000) proxies it under /api.
+  if (!/:\d+/.test(url.replace(/^https?:\/\//i, '')) && !/\/api$/.test(url)) url = `${url}:3001`;
+  return url;
+}
+
+const PROBE_TIMEOUT_MS = 2500;
+
+/**
+ * Find downloadarr without the user typing an address. First ask the LAN
+ * (newer downloadarr answers UDP broadcasts on 7360); failing that, try the
+ * Jellyfin host, since they usually run on the same machine, on the API port
+ * and behind the web UI's /api proxy. Resolves with the first that answers.
+ */
+export async function findDownloadarr(jellyfinAddress: string): Promise<string | null> {
+  const announced = await discoverDownloadarr().catch(() => null);
+  if (announced) return announced;
+
+  let host: string;
+  try {
+    host = new URL(jellyfinAddress).hostname;
+  } catch {
+    return null;
+  }
+  const candidates = [`http://${host}:3001`, `http://${host}:3000/api`];
+  const attempts = candidates.map(async (url) => {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), PROBE_TIMEOUT_MS);
+    try {
+      const res = await fetch(`${url}/movies/genres/list`, { signal: controller.signal });
+      const body = (await res.json()) as { success?: boolean };
+      if (res.ok && body.success) return url;
+    } catch {
+      // Not there.
+    } finally {
+      clearTimeout(timer);
+    }
+    throw new Error('no answer');
+  });
+  return Promise.any(attempts).catch(() => null);
+}
+
+export class Downloadarr {
+  constructor(readonly baseUrl: string) {}
+
+  private async call<T>(path: string, init?: RequestInit): Promise<T> {
+    let res: Response;
+    try {
+      res = await fetch(`${this.baseUrl}${path}`, {
+        ...init,
+        headers: { Accept: 'application/json', 'Content-Type': 'application/json', ...init?.headers },
+      });
+    } catch {
+      throw new DownloadarrError('Couldn’t reach downloadarr.');
+    }
+    const body = (await res.json().catch(() => null)) as { success?: boolean; data?: T; error?: string; message?: string } | null;
+    if (!res.ok || !body?.success) {
+      throw new DownloadarrError(body?.error ?? body?.message ?? `downloadarr returned ${res.status}`, res.status);
+    }
+    return body.data as T;
+  }
+
+  /** Cheap reachability check used by Settings. */
+  ping() {
+    return this.call<Genre[]>('/movies/genres/list');
+  }
+
+  genres(kind: MediaKind) {
+    return this.call<Genre[]>(`/${paths[kind]}/genres/list`);
+  }
+
+  byGenre(kind: MediaKind, genreId: number, page = 1) {
+    return this.call<DiscoverItem[]>(`/${paths[kind]}/genres/${genreId}?page=${page}`);
+  }
+
+  popular(kind: MediaKind, page = 1) {
+    return this.call<DiscoverItem[]>(`/${paths[kind]}/popular?page=${page}`);
+  }
+
+  search(kind: MediaKind, query: string) {
+    return this.call<DiscoverItem[]>(`/${paths[kind]}/search?query=${encodeURIComponent(query)}`);
+  }
+
+  details(kind: MediaKind, tmdbId: string) {
+    return this.call<DiscoverDetails>(`/${paths[kind]}/${encodeURIComponent(tmdbId)}`);
+  }
+
+  /** All requests (paged 100 at a time). There's no lookup by TMDB id, so callers index these. */
+  async requests(): Promise<TorrentRequest[]> {
+    const all: TorrentRequest[] = [];
+    for (let offset = 0; offset < 1000; offset += 100) {
+      const res = await fetch(`${this.baseUrl}/torrent-requests?limit=100&offset=${offset}`);
+      const body = (await res.json()) as { success: boolean; data: TorrentRequest[]; pagination?: { hasMore: boolean } };
+      if (!body.success) throw new DownloadarrError('Couldn’t load requests.');
+      all.push(...body.data);
+      if (!body.pagination?.hasMore) break;
+    }
+    return all;
+  }
+
+  /** Per-season (and per-episode) progress for a TV request. */
+  seasons(requestId: string) {
+    return this.call<RequestSeason[]>(`/torrent-requests/${requestId}/seasons?includeEpisodes=true`);
+  }
+
+  /** Search again for a request that failed or expired. */
+  retry(requestId: string) {
+    return this.call<TorrentRequest>(`/torrent-requests/${requestId}/search`, { method: 'POST' });
+  }
+
+  downloadStatus(requestId: string) {
+    return this.call<DownloadStatus>(`/torrent-requests/${requestId}/download-status`);
+  }
+
+  /**
+   * Request a movie, or a whole show (ongoing: new seasons are picked up too).
+   * The API rejects unknown body fields, so only documented ones are sent.
+   */
+  request(details: DiscoverDetails, kind: MediaKind, prefs: Settings['request']) {
+    const body = {
+      title: details.title,
+      year: details.year,
+      tmdbId: details.tmdbId ?? Number(details.id),
+      imdbId: details.imdbId,
+      posterUrl: details.poster,
+      backdropUrl: details.backdrop,
+      preferredQualities: prefs.qualities.flatMap((q) => QUALITY[q]),
+      preferredFormats: prefs.codecs.flatMap((c) => CODEC[c]),
+      preferredLanguages: prefs.languages.map((l) => LANGUAGE[l]),
+      ...(kind === 'tv' ? { isOngoing: true, totalSeasons: details.seasons, totalEpisodes: details.episodes } : {}),
+    };
+    return this.call<TorrentRequest>(`/torrent-requests/${kind === 'movie' ? 'movies' : 'tv-shows'}`, {
+      method: 'POST',
+      body: JSON.stringify(body),
+    });
+  }
+}

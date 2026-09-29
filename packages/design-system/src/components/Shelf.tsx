@@ -23,6 +23,10 @@ export function Shelf<T>({ title, data, renderItem, keyExtractor }: ShelfProps<T
         renderItem={renderItem}
         keyExtractor={keyExtractor}
         showsHorizontalScrollIndicator={false}
+        // Only about six cards fit on screen; keep low-end devices from building rows far ahead.
+        initialNumToRender={7}
+        maxToRenderPerBatch={4}
+        windowSize={5}
         // Vertical padding leaves room for the focus zoom so cards aren't clipped.
         contentContainerStyle={{
           paddingHorizontal: safeArea.horizontal,

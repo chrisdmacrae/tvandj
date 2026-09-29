@@ -7,7 +7,6 @@ import expo.modules.kotlin.modules.Module
 import expo.modules.kotlin.modules.ModuleDefinition
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import org.json.JSONObject
 import java.net.DatagramPacket
 import java.net.DatagramSocket
 import java.net.InetAddress
@@ -15,34 +14,37 @@ import java.net.NetworkInterface
 import java.net.SocketTimeoutException
 
 /**
- * Jellyfin's LAN discovery protocol: broadcast "who is JellyfinServer?" to
- * UDP 7359 and every server on the subnet replies with a JSON payload of
- * { Address, Id, Name, EndpointAddress }.
+ * LAN service discovery by UDP broadcast: send a question to a port on every
+ * subnet and collect whatever answers within the timeout. Jellyfin listens on
+ * 7359 for "who is JellyfinServer?"; downloadarr on 7360 for "who is Downloadarr?".
+ * Parsing the replies is left to JS so new services need no native changes.
  */
 class JellyfinDiscoveryModule : Module() {
   override fun definition() = ModuleDefinition {
     Name("JellyfinDiscovery")
 
-    AsyncFunction("discover") Coroutine { timeoutMs: Int ->
-      withContext(Dispatchers.IO) { discover(timeoutMs) }
+    AsyncFunction("broadcast") Coroutine { message: String, port: Int, timeoutMs: Int ->
+      withContext(Dispatchers.IO) { broadcast(message, port, timeoutMs) }
     }
   }
 
-  private fun discover(timeoutMs: Int): List<Map<String, String>> {
+  /** Each reply as { payload, address }, where address is the responder's IP. */
+  private fun broadcast(message: String, port: Int, timeoutMs: Int): List<Map<String, String>> {
     val wifi = appContext.reactContext?.applicationContext
       ?.getSystemService(Context.WIFI_SERVICE) as? WifiManager
+    // Some Wi-Fi drivers drop broadcast replies unless a multicast lock is held.
     val lock = wifi?.createMulticastLock("tv-and-j-discovery")?.apply {
       setReferenceCounted(false)
       acquire()
     }
-    val servers = LinkedHashMap<String, Map<String, String>>()
+    val replies = mutableListOf<Map<String, String>>()
 
     try {
       DatagramSocket().use { socket ->
         socket.broadcast = true
-        val message = MESSAGE.toByteArray()
+        val bytes = message.toByteArray()
         for (address in broadcastAddresses()) {
-          runCatching { socket.send(DatagramPacket(message, message.size, address, PORT)) }
+          runCatching { socket.send(DatagramPacket(bytes, bytes.size, address, port)) }
         }
 
         val deadline = System.currentTimeMillis() + timeoutMs
@@ -58,16 +60,9 @@ class JellyfinDiscoveryModule : Module() {
           } catch (e: SocketTimeoutException) {
             break
           }
-
-          val json = runCatching { JSONObject(String(packet.data, 0, packet.length)) }.getOrNull()
-          val id = json?.optString("Id").orEmpty()
-          val address = json?.optString("Address").orEmpty()
-          if (id.isEmpty() || address.isEmpty()) continue
-
-          servers[id] = mapOf(
-            "id" to id,
-            "name" to json!!.optString("Name"),
-            "address" to address,
+          replies += mapOf(
+            "payload" to String(packet.data, 0, packet.length),
+            "address" to (packet.address?.hostAddress ?: ""),
           )
         }
       }
@@ -75,7 +70,7 @@ class JellyfinDiscoveryModule : Module() {
       lock?.release()
     }
 
-    return servers.values.toList()
+    return replies
   }
 
   /** The global broadcast address plus each interface's subnet broadcast. */
@@ -85,10 +80,5 @@ class JellyfinDiscoveryModule : Module() {
       .filter { it.isUp && !it.isLoopback }
       .forEach { iface -> iface.interfaceAddresses.mapNotNullTo(addresses) { it.broadcast } }
     return addresses
-  }
-
-  companion object {
-    private const val PORT = 7359
-    private const val MESSAGE = "who is JellyfinServer?"
   }
 }

@@ -5,6 +5,7 @@ import { DarkTheme, Stack, ThemeProvider } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { colors } from '@tv-and-j/design-system';
 import { SessionProvider, useSession } from '../state/SessionContext';
+import { SettingsProvider } from '../state/SettingsContext';
 
 // Dark navigation chrome so nothing flashes the default light theme.
 const theme = {
@@ -27,8 +28,12 @@ function RootStack() {
         <Stack.Screen name="onboarding" />
       </Stack.Protected>
       <Stack.Protected guard={auth !== null}>
-        <Stack.Screen name="index" />
+        <Stack.Screen name="(browse)" />
         <Stack.Screen name="item/[id]" options={{ animation: 'fade' }} />
+        <Stack.Screen name="discover/[kind]/[tmdbId]" options={{ animation: 'fade' }} />
+        <Stack.Screen name="settings" options={{ animation: 'fade' }} />
+        <Stack.Screen name="search" options={{ animation: 'fade' }} />
+        <Stack.Screen name="switch-user" options={{ animation: 'fade' }} />
       </Stack.Protected>
     </Stack>
   );
@@ -39,8 +44,10 @@ export default function RootLayout() {
     <ThemeProvider value={theme}>
       <QueryClientProvider client={queryClient}>
         <SessionProvider>
-          <StatusBar hidden />
-          <RootStack />
+          <SettingsProvider>
+            <StatusBar hidden />
+            <RootStack />
+          </SettingsProvider>
         </SessionProvider>
       </QueryClientProvider>
     </ThemeProvider>
