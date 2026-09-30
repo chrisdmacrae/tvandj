@@ -1,23 +1,27 @@
 #!/usr/bin/env bash
-# Spin up TV and J's web app (the PWA) on a Linux box with Docker.
+# Spin up TV and J's web app (the PWA) on a Linux box with Docker. No checkout needed:
 #
-#   deploy/setup.sh                 # asks a few questions, then starts it
-#   deploy/setup.sh update          # newest image (or rebuild this checkout), restart
-#   deploy/setup.sh stop | logs | status
+#   curl -fsSL https://raw.githubusercontent.com/chrisdmacrae/tvandj/main/deploy/setup.sh | bash
 #
-# Non-interactive:
-#   deploy/setup.sh --yes --port 8080 --domain tv.example.com --email me@example.com
-#   deploy/setup.sh --yes --build   # build this checkout instead of pulling the prebuilt image
+# It asks a few questions, downloads docker-compose.yml and the Caddyfile into an install folder
+# (/opt/tvandj as root, ~/tvandj otherwise), saves your answers in .env there, and starts it.
+# A copy of this script goes in the folder too, to manage it afterwards:
 #
-# Answers are saved in deploy/.env; running it again keeps them as the defaults.
+#   ~/tvandj/setup.sh update     # newest compose files and app, restart
+#   ~/tvandj/setup.sh stop | logs | status
+#
+# Without questions (flags go after `bash -s --` when piping):
+#   curl -fsSL …/setup.sh | bash -s -- --yes --port 8080 --domain tv.example.com --email me@example.com
+#
+# Options: --dir <folder>, --port <n>, --domain <name> ("" for none), --email <address>, --yes.
+# TVANDJ_REF picks the branch or tag the files come from (default main).
 set -euo pipefail
 
-HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-ENV_FILE="$HERE/.env"
+REPO_RAW="https://raw.githubusercontent.com/chrisdmacrae/tvandj"
+SOURCE="${TVANDJ_SOURCE:-$REPO_RAW/${TVANDJ_REF:-main}/deploy}"
+FILES=(docker-compose.yml Caddyfile .env.example setup.sh)
 PREBUILT_IMAGE="ghcr.io/chrisdmacrae/tvandj-pwa:latest"
-LOCAL_IMAGE="tvandj-pwa:local"
-# Building the app (Metro) needs about 3 GB of memory.
-BUILD_MEMORY_MB=3500
+ENV_HEADER="# Written by TV and J's setup.sh; see .env.example for what each setting does."
 
 bold() { printf '\033[1m%s\033[0m\n' "$*"; }
 info() { printf '  %s\n' "$*"; }
@@ -25,7 +29,18 @@ warn() { printf '\033[33m! %s\033[0m\n' "$*" >&2; }
 die() { printf '\033[31m✗ %s\033[0m\n' "$*" >&2; exit 1; }
 
 usage() {
-  sed -n '2,13p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'
+  cat <<'EOF'
+Usage: setup.sh [install|update|stop|logs|status] [--dir <folder>] [--port <n>]
+                [--domain <name>] [--email <address>] [--yes]
+
+  install  (default) ask a few questions, download the compose files, start the app
+  update   download the newest compose files, pull the newest app, restart
+  stop     stop and remove the containers (settings and certificates are kept)
+  logs     follow the containers' logs
+  status   show the containers
+
+Piped from curl, pass options after `bash -s --`.
+EOF
   exit "${1:-0}"
 }
 
@@ -33,23 +48,23 @@ usage() {
 
 COMMAND=install
 ASSUME_YES=0
-ARG_PORT="" ARG_DOMAIN="" ARG_DOMAIN_GIVEN=0 ARG_EMAIL="" ARG_OMDB="" ARG_MODE=""
-[ -n "${1:-}" ] && [ "${1#-}" = "$1" ] && { COMMAND="$1"; shift; }
+ARG_DIR="" ARG_PORT="" ARG_DOMAIN="" ARG_DOMAIN_GIVEN=0 ARG_EMAIL=""
+if [ -n "${1:-}" ] && [ "${1#-}" = "$1" ]; then COMMAND="$1"; shift; fi
 while [ $# -gt 0 ]; do
   case "$1" in
     -y | --yes) ASSUME_YES=1 ;;
+    --dir) ARG_DIR="${2:?--dir needs a folder}"; shift ;;
     --port) ARG_PORT="${2:?--port needs a value}"; shift ;;
     --domain) ARG_DOMAIN="${2?--domain needs a value (\"\" for none)}"; ARG_DOMAIN_GIVEN=1; shift ;;
     --email) ARG_EMAIL="${2:?--email needs a value}"; shift ;;
-    --omdb-key) ARG_OMDB="${2:?--omdb-key needs a value}"; shift ;;
-    --build) ARG_MODE=build ;;
-    --prebuilt) ARG_MODE=prebuilt ;;
     -h | --help) usage ;;
     *) warn "Unknown option: $1"; usage 1 ;;
   esac
   shift
 done
-[ -t 0 ] || ASSUME_YES=1
+
+# Piped from curl, stdin is this script: questions go to the terminal instead. No terminal, no questions.
+if [ "$ASSUME_YES" = 0 ] && ! { true </dev/tty; } 2>/dev/null; then ASSUME_YES=1; fi
 
 ask() { # ask "Question" default -> answer
   local answer
@@ -65,9 +80,35 @@ confirm() { # confirm "Question" -> 0 for yes
   [[ "$answer" =~ ^[Yy] ]]
 }
 
+# ---- install folder --------------------------------------------------------------
+
+# Run as <folder>/setup.sh from an install: that folder. Otherwise --dir, or the default.
+SELF="${BASH_SOURCE[0]:-}"
+if [ -z "$ARG_DIR" ] && [ -f "$SELF" ] && head -1 "$(dirname "$SELF")/.env" 2>/dev/null | grep -qF "$ENV_HEADER"; then
+  DIR="$(cd "$(dirname "$SELF")" && pwd)"
+elif [ -n "$ARG_DIR" ]; then
+  DIR="$ARG_DIR"
+elif [ "$(id -u)" = 0 ]; then
+  DIR=/opt/tvandj
+else
+  DIR="$HOME/tvandj"
+fi
+ENV_FILE="$DIR/.env"
+
+download() {
+  command -v curl >/dev/null 2>&1 || die "curl is needed to download the compose files."
+  mkdir -p "$DIR"
+  info "Downloading the compose files into $DIR"
+  local f
+  for f in "${FILES[@]}"; do
+    curl -fsSL "$SOURCE/$f" -o "$DIR/$f.download" || die "Couldn't download $SOURCE/$f"
+    mv "$DIR/$f.download" "$DIR/$f"
+  done
+  chmod +x "$DIR/setup.sh"
+}
+
 # ---- docker ----------------------------------------------------------------------
 
-SUDO=""
 COMPOSE=()
 
 find_docker() {
@@ -85,55 +126,52 @@ find_docker() {
     curl -fsSL https://get.docker.com | sudo sh
   fi
 
+  local sudo=""
   # Not in the docker group yet: use sudo rather than fail.
   if ! docker info >/dev/null 2>&1; then
-    if sudo -n true 2>/dev/null || [ -t 0 ]; then
-      sudo docker info >/dev/null 2>&1 || die "Docker isn't running. Start it (sudo systemctl enable --now docker) and try again."
-      SUDO=sudo
-      info "Using sudo for Docker (add yourself to the docker group to skip this: sudo usermod -aG docker \$USER)."
-    else
-      die "Can't talk to Docker. Is it running, and are you in the docker group?"
-    fi
+    sudo docker info >/dev/null 2>&1 || die "Can't talk to Docker. Is it running (sudo systemctl enable --now docker)?"
+    sudo=sudo
+    info "Using sudo for Docker (add yourself to the docker group to skip this: sudo usermod -aG docker \$USER)."
   fi
 
-  $SUDO docker compose version >/dev/null 2>&1 ||
+  if [ -n "$sudo" ]; then COMPOSE=(sudo docker compose); else COMPOSE=(docker compose); fi
+  "${COMPOSE[@]}" version >/dev/null 2>&1 ||
     die "Docker Compose v2 is missing. Install the compose plugin: https://docs.docker.com/compose/install/linux/"
-  if [ -n "$SUDO" ]; then COMPOSE=(sudo docker compose); else COMPOSE=(docker compose); fi
 }
 
 compose() {
   local profiles=()
   [ -n "${DOMAIN:-}" ] && profiles=(--profile https)
-  "${COMPOSE[@]}" --project-directory "$HERE" -f "$HERE/docker-compose.yml" --env-file "$ENV_FILE" "${profiles[@]}" "$@"
+  "${COMPOSE[@]}" --project-directory "$DIR" -f "$DIR/docker-compose.yml" --env-file "$ENV_FILE" "${profiles[@]}" "$@"
 }
 
 # ---- settings --------------------------------------------------------------------
 
 load_env() {
-  HTTP_PORT=8080 DOMAIN="" ACME_EMAIL="" OMDB_API_KEY="" PWA_IMAGE="$PREBUILT_IMAGE" PWA_PULL_POLICY=missing
-  if [ -f "$ENV_FILE" ]; then
-    # Only our own KEY=value lines; never executed as a script.
-    while IFS='=' read -r key value; do
-      case "$key" in
-        HTTP_PORT | DOMAIN | ACME_EMAIL | OMDB_API_KEY | PWA_IMAGE | PWA_PULL_POLICY) printf -v "$key" '%s' "$value" ;;
-      esac
-    done < <(grep -E '^[A-Z_]+=' "$ENV_FILE")
+  HTTP_PORT=8080 DOMAIN="" ACME_EMAIL="" PWA_IMAGE="$PREBUILT_IMAGE"
+  [ -f "$ENV_FILE" ] || return 0
+  # Only our own KEY=value lines; never executed as a script.
+  local key value
+  while IFS='=' read -r key value; do
+    case "$key" in
+      HTTP_PORT | DOMAIN | ACME_EMAIL | PWA_IMAGE) printf -v "$key" '%s' "$value" ;;
+    esac
+  done < <(grep -E '^[A-Z_]+=' "$ENV_FILE")
+  # Older setups could build a local image; there's nothing to build from any more.
+  if [ "$PWA_IMAGE" = "tvandj-pwa:local" ]; then
+    warn "Switching from a locally built image to the prebuilt one."
+    PWA_IMAGE="$PREBUILT_IMAGE"
   fi
 }
 
 save_env() {
-  (
-    umask 077 # it can hold an API key
-    cat >"$ENV_FILE" <<EOF
-# Written by deploy/setup.sh; see .env.example for what each setting does.
+  cat >"$ENV_FILE" <<EOF
+$ENV_HEADER
 HTTP_PORT=$HTTP_PORT
 DOMAIN=$DOMAIN
 ACME_EMAIL=$ACME_EMAIL
 PWA_IMAGE=$PWA_IMAGE
-PWA_PULL_POLICY=$PWA_PULL_POLICY
-OMDB_API_KEY=$OMDB_API_KEY
 EOF
-  )
 }
 
 port_in_use() {
@@ -143,6 +181,7 @@ port_in_use() {
 # Our own containers holding a port is fine: they're about to be recreated.
 port_taken_by_others() {
   port_in_use "$1" || return 1
+  [ -f "$ENV_FILE" ] || return 0
   local ours
   ours=$(compose ps --format '{{.Ports}}' 2>/dev/null || true)
   ! grep -q ":$1->" <<<"$ours"
@@ -154,7 +193,7 @@ configure() {
 
   HTTP_PORT="${ARG_PORT:-$(ask "Port to serve it on over HTTP" "$HTTP_PORT")}"
   [[ "$HTTP_PORT" =~ ^[0-9]+$ ]] && [ "$HTTP_PORT" -ge 1 ] && [ "$HTTP_PORT" -le 65535 ] || die "Not a port: $HTTP_PORT"
-  port_taken_by_others "$HTTP_PORT" && die "Port $HTTP_PORT is already in use. Pick another with --port."
+  if port_taken_by_others "$HTTP_PORT"; then die "Port $HTTP_PORT is already in use. Pick another with --port."; fi
 
   if [ "$ARG_DOMAIN_GIVEN" = 1 ]; then
     DOMAIN="$ARG_DOMAIN"
@@ -170,62 +209,38 @@ configure() {
   if [ -n "$DOMAIN" ]; then
     ACME_EMAIL="${ARG_EMAIL:-$(ask "Email for Let's Encrypt (certificate expiry notices)" "$ACME_EMAIL")}"
     [[ "$ACME_EMAIL" == *@* ]] || die "HTTPS needs an email for Let's Encrypt (--email you@example.com)."
-    for p in 80 443; do port_taken_by_others "$p" && die "Port $p is in use by something else; HTTPS needs it."; done
+    local p
+    for p in 80 443; do
+      if port_taken_by_others "$p"; then die "Port $p is in use by something else; HTTPS needs it."; fi
+    done
   fi
-
-  local mode=prebuilt
-  [ "$PWA_IMAGE" = "$LOCAL_IMAGE" ] && mode=build
-  if [ -n "$ARG_MODE" ]; then
-    mode="$ARG_MODE"
-  elif [ "$ASSUME_YES" = 0 ]; then
-    info "Prebuilt: the latest release from GitHub, ready in seconds."
-    info "Build: this checkout, including any local changes (a few minutes, ~${BUILD_MEMORY_MB} MB of memory)."
-    mode="$(ask "Prebuilt or build" "$mode")"
-  fi
-  case "$mode" in
-    prebuilt | p*) PWA_IMAGE="$PREBUILT_IMAGE" PWA_PULL_POLICY=missing ;;
-    build | b*)
-      [ -f "$HERE/../apps/pwa/Dockerfile" ] || die "Building needs the whole repository checked out around deploy/."
-      PWA_IMAGE="$LOCAL_IMAGE" PWA_PULL_POLICY=build
-      OMDB_API_KEY="${ARG_OMDB:-$(ask "OMDb API key for IMDb/Rotten Tomatoes ratings (optional)" "$OMDB_API_KEY")}"
-      local mem_mb
-      mem_mb=$(awk '/MemTotal/ { print int($2 / 1024) }' /proc/meminfo 2>/dev/null || echo 0)
-      if [ "$mem_mb" -gt 0 ] && [ "$mem_mb" -lt "$BUILD_MEMORY_MB" ]; then
-        warn "This box has ${mem_mb} MB of memory; the build may run out. Add swap, or use the prebuilt image."
-      fi
-      ;;
-    *) die "Choose prebuilt or build, not: $mode" ;;
-  esac
 
   save_env
-  info "Saved to deploy/.env"
+  info "Settings saved in $ENV_FILE"
 }
 
 # ---- actions ---------------------------------------------------------------------
 
 start() {
-  if [ "$PWA_PULL_POLICY" = build ]; then
-    bold "Building the app (this takes a few minutes)…"
-    compose build pwa
-  else
-    bold "Pulling the app…"
-    compose pull pwa
-  fi
-  [ -n "$DOMAIN" ] && compose pull caddy
+  bold "Pulling the app…"
+  compose pull
   bold "Starting…"
   compose up -d --remove-orphans
-  # Without a domain, an old HTTPS proxy from a previous setup shouldn't linger.
-  [ -z "$DOMAIN" ] && "${COMPOSE[@]}" --project-directory "$HERE" -f "$HERE/docker-compose.yml" --env-file "$ENV_FILE" --profile https rm -sf caddy >/dev/null 2>&1 || true
+  # Without a domain, an HTTPS proxy from an earlier setup shouldn't linger.
+  if [ -z "$DOMAIN" ]; then
+    "${COMPOSE[@]}" --project-directory "$DIR" -f "$DIR/docker-compose.yml" --env-file "$ENV_FILE" --profile https rm -sf caddy >/dev/null 2>&1 || true
+  fi
   wait_until_up
   summary
 }
 
 wait_until_up() {
+  local _
   for _ in $(seq 1 30); do
     curl -fsS -o /dev/null "http://127.0.0.1:$HTTP_PORT/" 2>/dev/null && return 0
     sleep 1
   done
-  warn "The app didn't answer on port $HTTP_PORT yet. Check: deploy/setup.sh logs"
+  warn "The app didn't answer on port $HTTP_PORT yet. Check: $DIR/setup.sh logs"
 }
 
 summary() {
@@ -239,35 +254,44 @@ summary() {
     info "Over HTTPS:       https://$DOMAIN   (the certificate can take a minute the first time)"
     info "Over HTTPS, the browser only lets the app reach a Jellyfin (and downloadarr) that's on HTTPS too."
   else
-    info "Over plain HTTP, browsers won't offer to install the app. Run again with a domain to add HTTPS."
+    info "Over plain HTTP, browsers won't offer to install the app. Run setup again with a domain to add HTTPS."
   fi
-  info "Update later with: deploy/setup.sh update"
+  info "Manage it with:   $DIR/setup.sh update | stop | logs | status"
+}
+
+needs_install() {
+  [ -f "$ENV_FILE" ] || die "Not set up in $DIR yet. Run setup.sh without a command first (or pass --dir)."
 }
 
 case "$COMMAND" in
   install)
     find_docker
+    download
     configure
     start
     ;;
   update)
+    needs_install
     find_docker
-    [ -f "$ENV_FILE" ] || die "Not set up yet. Run deploy/setup.sh first."
+    download
     load_env
-    [ "$PWA_PULL_POLICY" = build ] && info "Rebuilding this checkout; git pull first for the newest code."
+    save_env # picks up any settings format change
     start
     ;;
   stop)
+    needs_install
     find_docker
     load_env
     compose down
     ;;
   logs)
+    needs_install
     find_docker
     load_env
     compose logs -f --tail 100
     ;;
   status)
+    needs_install
     find_docker
     load_env
     compose ps

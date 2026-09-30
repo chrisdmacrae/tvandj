@@ -1,9 +1,9 @@
-# TV and J's web app (the PWA) on a Linux box. deploy/setup.sh writes deploy/.env and runs this;
-# to do it by hand: cp .env.example .env, edit, then `docker compose up -d` from this folder.
+# TV and J's web app (the PWA) on a Linux box. setup.sh downloads this next to itself, with the
+# Caddyfile, writes .env and starts it:
 #
-# - pwa:   the static app behind nginx (apps/pwa/Dockerfile). Prebuilt from GitHub Container
-#          Registry by default; set PWA_IMAGE=tvandj-pwa:local and PWA_PULL_POLICY=build to build
-#          this checkout instead.
+#   curl -fsSL https://raw.githubusercontent.com/chrisdmacrae/tvandj/main/deploy/setup.sh | bash
+#
+# - pwa:   the static app behind nginx, prebuilt for amd64 and arm64 from apps/pwa/Dockerfile.
 # - caddy: optional HTTPS in front of it, with a free Let's Encrypt certificate for DOMAIN
 #          (`--profile https`). Browsers only install the app, and only run its service worker,
 #          over HTTPS (or on localhost).
@@ -12,13 +12,6 @@ name: tvandj
 services:
   pwa:
     image: ${PWA_IMAGE:-ghcr.io/chrisdmacrae/tvandj-pwa:latest}
-    pull_policy: ${PWA_PULL_POLICY:-missing}
-    build:
-      context: ..
-      dockerfile: apps/pwa/Dockerfile
-      args:
-        # Optional IMDb and Rotten Tomatoes ratings. Baked into the app, so anyone using it can read it.
-        EXPO_PUBLIC_OMDB_API_KEY: ${OMDB_API_KEY:-}
     restart: unless-stopped
     ports:
       - "${HTTP_PORT:-8080}:80"

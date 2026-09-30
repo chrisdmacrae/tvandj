@@ -26,25 +26,29 @@ npm run android:tv -- -d <deviceName>
 
 ## Hosting the web app
 
-`deploy/` runs the PWA on a Linux box with Docker: nginx serving the app, plus optional HTTPS
-through Caddy with a Let's Encrypt certificate.
+On any Linux box with Docker (the script offers to install it), no checkout needed:
 
 ```sh
-git clone https://github.com/chrisdmacrae/tvandj.git && cd tvandj
-deploy/setup.sh              # asks for a port, an optional domain, prebuilt or build
-deploy/setup.sh update       # newest image (or rebuild), restart
-deploy/setup.sh stop | logs | status
+curl -fsSL https://raw.githubusercontent.com/chrisdmacrae/tvandj/main/deploy/setup.sh | bash
 ```
 
-- **Prebuilt** (default) pulls `ghcr.io/chrisdmacrae/tvandj-pwa:latest`, built by CI for amd64 and arm64.
-  **Build** builds your checkout instead (needs ~3.5 GB of memory), and is the only way to bake in an OMDb key.
-- **HTTPS** needs a domain pointing at the box, ports 80 and 443 open, and an email for Let's Encrypt.
-  Browsers only install the app and run its service worker over HTTPS. Over HTTPS the app can only
-  reach a Jellyfin (and downloadarr) that's on HTTPS too.
-- It installs Docker for you (after asking) if it's missing, and uses `sudo` if you aren't in the docker group.
-  `--yes` with `--port`, `--domain`, `--email`, `--build` runs it without questions.
+It asks for a port and an optional domain, downloads `deploy/docker-compose.yml` and the `Caddyfile`
+into an install folder (`/opt/tvandj` as root, `~/tvandj` otherwise, or `--dir`), saves the answers in
+`.env` there, and starts the prebuilt app (`ghcr.io/chrisdmacrae/tvandj-pwa`, amd64 and arm64). A copy
+of the script goes in the folder to manage it:
 
-Settings are saved in `deploy/.env` (see `deploy/.env.example`); `docker compose` in `deploy/` works directly too.
+```sh
+~/tvandj/setup.sh update     # newest compose files and app, restart
+~/tvandj/setup.sh stop | logs | status
+```
+
+- **HTTPS** (optional) runs Caddy with a Let's Encrypt certificate: a domain pointing at the box, ports
+  80 and 443 open, and an email. Browsers only install the app and run its service worker over HTTPS, and
+  over HTTPS the app can only reach a Jellyfin (and downloadarr) that's on HTTPS too.
+- Without questions: `curl -fsSL …/setup.sh | bash -s -- --yes --port 8080 --domain tv.example.com --email me@example.com`.
+  `TVANDJ_REF=<branch or tag>` takes the files from somewhere other than `main`.
+- To build the image yourself (e.g. with an OMDb key baked in): `docker build -f apps/pwa/Dockerfile .`
+  from a checkout, then set `PWA_IMAGE` in the install folder's `.env`.
 
 ## Local Jellyfin for development
 
