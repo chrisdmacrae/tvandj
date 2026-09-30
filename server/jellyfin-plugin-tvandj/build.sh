@@ -3,7 +3,7 @@
 # packages it as dist/tvandj_<version>.zip for Jellyfin's plugins folder.
 set -e
 cd "$(dirname "$0")"
-VERSION=1.1.0.0
+VERSION=1.2.0.0
 rm -rf dist bin obj
 "${DOCKER:-docker}" run --rm -v "$PWD":/src -w /src mcr.microsoft.com/dotnet/sdk:10.0 \
   dotnet publish Jellyfin.Plugin.TvAndJ.csproj -c Release -o /src/dist/TVandJ_$VERSION

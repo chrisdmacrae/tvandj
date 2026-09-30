@@ -20,11 +20,15 @@ public class ListenBrainzClient(IHttpClientFactory httpClientFactory)
         return json.TryGetProperty("valid", out var valid) && valid.GetBoolean() ? json.GetProperty("user_name").GetString() : null;
     }
 
-    public Task NowPlaying(string token, Track track, CancellationToken ct) => Submit(token, "playing_now", track, null, ct);
+    public Task NowPlaying(string token, Track track, CancellationToken ct) => Submit(token, "playing_now", [Listen(track, null)], ct);
 
-    public Task Listen(string token, Track track, DateTimeOffset startedAt, CancellationToken ct) => Submit(token, "single", track, startedAt, ct);
+    public Task Listen(string token, Track track, DateTimeOffset startedAt, CancellationToken ct) => Submit(token, "single", [Listen(track, startedAt)], ct);
 
-    private async Task Submit(string token, string type, Track t, DateTimeOffset? listenedAt, CancellationToken ct)
+    /// <summary>Several listens at once (a whole album), as ListenBrainz's "import" submission.</summary>
+    public Task Import(string token, IEnumerable<(Track Track, DateTimeOffset At)> listens, CancellationToken ct) =>
+        Submit(token, "import", listens.Select(l => Listen(l.Track, l.At)).ToArray(), ct);
+
+    private static JsonObject Listen(Track t, DateTimeOffset? listenedAt)
     {
         var info = new JsonObject { ["media_player"] = "Jellyfin", ["submission_client"] = "TV and J" };
         if (t.DurationSeconds is { } d) info["duration_ms"] = d * 1000;
@@ -37,10 +41,14 @@ public class ListenBrainzClient(IHttpClientFactory httpClientFactory)
         if (!string.IsNullOrEmpty(t.Album)) metadata["release_name"] = t.Album;
         var listen = new JsonObject { ["track_metadata"] = metadata };
         if (listenedAt is { } at) listen["listened_at"] = at.ToUnixTimeSeconds();
+        return listen;
+    }
 
+    private async Task Submit(string token, string type, JsonNode[] listens, CancellationToken ct)
+    {
         using var request = new HttpRequestMessage(HttpMethod.Post, Api + "submit-listens")
         {
-            Content = JsonContent.Create(new JsonObject { ["listen_type"] = type, ["payload"] = new JsonArray(listen) }),
+            Content = JsonContent.Create(new JsonObject { ["listen_type"] = type, ["payload"] = new JsonArray(listens) }),
         };
         request.Headers.Authorization = new AuthenticationHeaderValue("Token", token);
         using var response = await httpClientFactory.CreateClient().SendAsync(request, ct).ConfigureAwait(false);

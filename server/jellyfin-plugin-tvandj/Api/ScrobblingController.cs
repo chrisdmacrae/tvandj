@@ -1,6 +1,7 @@
 using System.ComponentModel.DataAnnotations;
 using System.Net.Mime;
 using Jellyfin.Plugin.TvAndJ.Scrobbling;
+using MediaBrowser.Controller.Library;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -13,7 +14,13 @@ namespace Jellyfin.Plugin.TvAndJ.Api;
 /// <param name="Username">Their username on the service.</param>
 public record ScrobbleService(bool Available, bool Connected, string? Username);
 
-public record ScrobbleStatus(ScrobbleService Lastfm, ScrobbleService ListenBrainz, ScrobbleService Trakt);
+/// <param name="TraktWatchlistSync">My List (unwatched) goes to their Trakt watchlist.</param>
+public record ScrobbleStatus(ScrobbleService Lastfm, ScrobbleService ListenBrainz, ScrobbleService Trakt, bool TraktWatchlistSync);
+
+public record WatchlistSyncSetting(bool Enabled);
+
+/// <param name="Added">Titles added to the Trakt watchlist by turning sync on.</param>
+public record WatchlistSyncResult(ScrobbleStatus Status, int Added);
 
 public record LastfmLogin([Required] string Username, [Required] string Password);
 
@@ -38,7 +45,11 @@ public class ScrobblingController(
     ListenBrainzClient listenBrainz,
     TraktClient trakt,
     TraktSignIns signIns,
-    Scrobbler scrobbler) : ControllerBase
+    Scrobbler scrobbler,
+    ManualScrobbler manual,
+    WatchlistSync watchlist,
+    ILibraryManager library,
+    IUserManager users) : ControllerBase
 {
     // Jellyfin's own claim for the signed-in user (Jellyfin.Api's InternalClaimTypes.UserId).
     private Guid UserId => Guid.Parse(User.FindFirst("Jellyfin-UserId")!.Value);
@@ -53,7 +64,8 @@ public class ScrobblingController(
         return new ScrobbleStatus(
             new ScrobbleService(Scrobbler.LastfmReady(Config), a.LastfmSessionKey is not null, a.LastfmUser),
             new ScrobbleService(true, a.ListenBrainzToken is not null, a.ListenBrainzUser),
-            new ScrobbleService(Scrobbler.TraktReady(Config), a.TraktAccessToken is not null, a.TraktUser));
+            new ScrobbleService(Scrobbler.TraktReady(Config), a.TraktAccessToken is not null, a.TraktUser),
+            a.TraktWatchlistSync && a.TraktAccessToken is not null);
     }
 
     /// <summary>Sign in to Last.fm. The password goes to Last.fm once and isn't kept; only the session key is.</summary>
@@ -129,6 +141,53 @@ public class ScrobblingController(
         }
     }
 
+    /// <summary>
+    /// Keep the Trakt watchlist in step with My List (unwatched movies and shows), or stop. Turning it
+    /// on pushes what's on My List now; turning it off leaves the watchlist as it is.
+    /// </summary>
+    [HttpPut("Trakt/Watchlist")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    public async Task<ActionResult<WatchlistSyncResult>> SetWatchlistSync([FromBody] WatchlistSyncSetting setting, CancellationToken ct)
+    {
+        var userId = UserId;
+        if (setting.Enabled && accounts.Get(userId).TraktAccessToken is null) return Problem("Connect Trakt first.", statusCode: 400);
+        var added = 0;
+        if (setting.Enabled)
+        {
+            try
+            {
+                added = await watchlist.PushAll(userId, ct).ConfigureAwait(false);
+            }
+            catch (ScrobbleException ex)
+            {
+                return Problem(ex.Message, statusCode: 400);
+            }
+        }
+
+        accounts.Update(userId, a => a.TraktWatchlistSync = setting.Enabled);
+        return new WatchlistSyncResult(Status(), added);
+    }
+
+    /// <summary>
+    /// Scrobble something now, played or not: a song or album to Last.fm and ListenBrainz; a movie,
+    /// episode, season or show to Trakt's history. One outcome per service it went to.
+    /// </summary>
+    [HttpPost("Items/{itemId}")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<ActionResult<IReadOnlyList<ScrobbleOutcome>>> ScrobbleItem([FromRoute] Guid itemId, CancellationToken ct)
+    {
+        var userId = UserId;
+        var user = users.GetUserById(userId);
+        var item = library.GetItemById(itemId);
+        // Only what this person can see in their own library.
+        if (user is null || item is null || !item.IsVisible(user)) return NotFound();
+        if (!ManualScrobbler.Supports(item)) return Problem("Only songs, albums, movies, episodes, seasons and shows can be scrobbled.", statusCode: 400);
+        return Ok(await manual.Scrobble(userId, item, ct).ConfigureAwait(false));
+    }
+
     /// <summary>Disconnect a service (lastfm, listenbrainz or trakt). Trakt's token is revoked too.</summary>
     [HttpDelete("{service}")]
     [ProducesResponseType(StatusCodes.Status200OK)]
@@ -152,7 +211,11 @@ public class ScrobblingController(
                     try { await trakt.Revoke(Config.TraktClientId, Config.TraktClientSecret, token, ct).ConfigureAwait(false); } catch (Exception) { }
                 }
 
-                accounts.Update(userId, a => (a.TraktUser, a.TraktAccessToken, a.TraktRefreshToken, a.TraktExpiresAt) = (null, null, null, 0));
+                accounts.Update(userId, a =>
+                {
+                    (a.TraktUser, a.TraktAccessToken, a.TraktRefreshToken, a.TraktExpiresAt) = (null, null, null, 0);
+                    a.TraktWatchlistSync = false;
+                });
                 break;
             default:
                 return NotFound();

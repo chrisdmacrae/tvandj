@@ -18,19 +18,22 @@ export type ScrobbleServiceState = {
   username?: string;
 };
 
-export type ScrobbleStatus = Record<ScrobbleService, ScrobbleServiceState>;
+export type ScrobbleStatus = Record<ScrobbleService, ScrobbleServiceState> & {
+  /** Unwatched My List titles go to their Trakt watchlist (plugin 1.2+). */
+  traktWatchlistSync: boolean;
+};
 
 const PATH = '/TvAndJ/Scrobbling';
 
 // The server answers in Jellyfin's PascalCase and leaves out empty fields.
-type Wire = Record<'Lastfm' | 'ListenBrainz' | 'Trakt', { Available: boolean; Connected: boolean; Username?: string }>;
+type Wire = Record<'Lastfm' | 'ListenBrainz' | 'Trakt', { Available: boolean; Connected: boolean; Username?: string }> & { TraktWatchlistSync?: boolean };
 
 function fromWire(w: Wire): ScrobbleStatus {
   const one = (s: Wire['Lastfm']) => ({ available: s.Available, connected: s.Connected, username: s.Username });
-  return { lastfm: one(w.Lastfm), listenbrainz: one(w.ListenBrainz), trakt: one(w.Trakt) };
+  return { lastfm: one(w.Lastfm), listenbrainz: one(w.ListenBrainz), trakt: one(w.Trakt), traktWatchlistSync: !!w.TraktWatchlistSync };
 }
 
-async function call<T>(api: Api, method: 'GET' | 'POST' | 'DELETE', path: string, data?: unknown): Promise<T> {
+async function call<T>(api: Api, method: 'GET' | 'POST' | 'PUT' | 'DELETE', path: string, data?: unknown): Promise<T> {
   try {
     const res = await api.axiosInstance.request<T>({
       method,
@@ -150,4 +153,54 @@ export function useTraktSignIn() {
   }, [stopPolling]);
 
   return { signIn, start, cancel };
+}
+
+const MUSIC_TYPES = new Set(['Audio', 'MusicAlbum']);
+const VIDEO_TYPES = new Set(['Movie', 'Episode', 'Season', 'Series']);
+
+/** Whether a "Scrobble" button makes sense for this item: it's a kind that scrobbles, and its service is connected. */
+export function canScrobble(status: ScrobbleStatus | null | undefined, itemType: string | null | undefined) {
+  if (!status || !itemType) return false;
+  if (MUSIC_TYPES.has(itemType)) return status.lastfm.connected || status.listenbrainz.connected;
+  if (VIDEO_TYPES.has(itemType)) return status.trakt.connected;
+  return false;
+}
+
+export type ScrobbleOutcome = { service: string; sent: boolean; message?: string };
+
+/** "Scrobble this now", played or not (TV and J plugin 1.2+): one outcome per service it went to. */
+export function useScrobbleItem() {
+  const { api } = useAuthedSession();
+  return useMutation({
+    mutationFn: async (itemId: string) => {
+      const wire = await call<{ Service: string; Sent: boolean; Message?: string }[]>(api, 'POST', `/Items/${encodeURIComponent(itemId)}`);
+      return wire.map((o) => ({ service: o.Service, sent: o.Sent, message: o.Message }));
+    },
+  });
+}
+
+/** One line for what happened: "Scrobbled to Last.fm and ListenBrainz", or what went wrong. */
+export function scrobbleSummary(outcomes: ScrobbleOutcome[]) {
+  const sent = outcomes.filter((o) => o.sent).map((o) => o.service);
+  const failed = outcomes.filter((o) => !o.sent);
+  const parts = [];
+  if (sent.length) parts.push(`Scrobbled to ${sent.join(' and ')}`);
+  for (const f of failed) parts.push(`${f.service}: ${f.message ?? 'didn’t work'}`);
+  return { ok: failed.length === 0, text: parts.join('. ') };
+}
+
+/**
+ * Keep the Trakt watchlist in step with My List (unwatched movies and shows, one way), or stop.
+ * Turning it on pushes what's on My List now; resolves with how many titles that added.
+ */
+export function useWatchlistSync() {
+  const { api, auth } = useAuthedSession();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (enabled: boolean) => {
+      const res = await call<{ Status: Wire; Added: number }>(api, 'PUT', '/Trakt/Watchlist', { Enabled: enabled });
+      return { status: fromWire(res.Status), added: res.Added };
+    },
+    onSuccess: ({ status }) => queryClient.setQueryData(['scrobbling', auth.userId], status),
+  });
 }

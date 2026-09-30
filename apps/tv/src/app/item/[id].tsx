@@ -9,6 +9,7 @@ import { ArrowLeftIcon, Button, Chip, DownloadBar, IconButton, Shelf, Text, colo
 import { backdropUrl, logoUrl, posterUrl } from '@tv-and-j/core/jellyfin/images';
 import { downloadDisplay } from '../../components/DiscoverCard';
 import { DeleteButton } from '../../components/DeleteButton';
+import { ScrobbleButton } from '../../components/ScrobbleButton';
 import { FittedText } from '../../components/FittedText';
 import { useMusic } from '../../music/MusicPlayer';
 import { MediaCard } from '../../components/MediaCard';
@@ -412,6 +413,7 @@ export default function ItemScreen() {
                     onPress={() => item.Id && !togglePlayed.isPending && togglePlayed.mutate({ itemId: item.Id, on: !watched })}
                   />
                 ) : null}
+                <ScrobbleButton itemId={item.Id} itemType={item.Type} onFocus={scrollToTop} />
                 <DeleteButton item={item} label="Delete" onFocus={scrollToTop} onDeleted={() => (router.canGoBack() ? router.back() : router.replace('/'))} />
               </View>
             ) : null}

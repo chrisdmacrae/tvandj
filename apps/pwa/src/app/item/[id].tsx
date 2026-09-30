@@ -15,6 +15,7 @@ import { DevicePicker } from '../../components/DevicePicker';
 import { Episodes } from '../../components/Episodes';
 import { useRemoteTarget } from '../../lib/remoteTarget';
 import { ItemCard } from '../../components/ItemCard';
+import { ScrobbleButton } from '../../components/ScrobbleButton';
 import { goBack } from '../../lib/nav';
 
 const TICKS_PER_SECOND = 10_000_000;
@@ -130,6 +131,7 @@ export default function ItemPage() {
             variant="ghost"
             onPress={() => item.Id && togglePlayed.mutate({ itemId: item.Id, on: !watched })}
           />
+          <ScrobbleButton itemId={item.Id} itemType={item.Type} />
         </View>
       </View>
       {item.Overview ? (

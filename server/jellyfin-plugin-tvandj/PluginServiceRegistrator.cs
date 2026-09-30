@@ -17,6 +17,9 @@ public class PluginServiceRegistrator : IPluginServiceRegistrator
         serviceCollection.AddSingleton<TraktClient>();
         serviceCollection.AddSingleton<TraktSignIns>();
         serviceCollection.AddSingleton<Scrobbler>();
+        serviceCollection.AddSingleton<ManualScrobbler>();
+        serviceCollection.AddSingleton<WatchlistSync>();
+        serviceCollection.AddHostedService(sp => sp.GetRequiredService<WatchlistSync>());
         serviceCollection.AddHostedService(sp => sp.GetRequiredService<Scrobbler>());
     }
 }

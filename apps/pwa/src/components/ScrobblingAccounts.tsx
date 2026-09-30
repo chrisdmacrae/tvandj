@@ -1,12 +1,13 @@
 import { useState, type ReactNode } from 'react';
 import { ActivityIndicator, Linking, View } from 'react-native';
-import { Button, Text, TextField, colors, spacing } from '@tv-and-j/design-system';
+import { Button, SelectChip, Text, TextField, colors, spacing } from '@tv-and-j/design-system';
 import {
   useConnectLastfm,
   useConnectListenBrainz,
   useDisconnectScrobbler,
   useScrobbling,
   useTraktSignIn,
+  useWatchlistSync,
   type ScrobbleService,
   type ScrobbleServiceState,
 } from '@tv-and-j/core/jellyfin/scrobbling';
@@ -39,7 +40,7 @@ export function ScrobblingAccounts() {
       <Service name="ListenBrainz" what="The music you play. If downloadarr reads this ListenBrainz account, it recommends from it too." service="listenbrainz" state={s.listenbrainz}>
         <ListenBrainzSignIn />
       </Service>
-      <Service name="Trakt" what="Movies and shows you watch." service="trakt" state={s.trakt}>
+      <Service name="Trakt" what="Movies and shows you watch." service="trakt" state={s.trakt} extra={<WatchlistToggle on={s.traktWatchlistSync} />}>
         {s.trakt.available ? <TraktSignInButton /> : <Text variant="caption" tone="tertiary">{SETUP_HINT.trakt}</Text>}
       </Service>
     </View>
@@ -47,7 +48,22 @@ export function ScrobblingAccounts() {
 }
 
 /** One service: connected as someone (with Disconnect), or the way to connect it. */
-function Service({ name, what, service, state, children }: { name: string; what: string; service: ScrobbleService; state: ScrobbleServiceState; children: ReactNode }) {
+function Service({
+  name,
+  what,
+  service,
+  state,
+  extra,
+  children,
+}: {
+  name: string;
+  what: string;
+  service: ScrobbleService;
+  state: ScrobbleServiceState;
+  /** More settings for once it's connected. */
+  extra?: ReactNode;
+  children: ReactNode;
+}) {
   const disconnect = useDisconnectScrobbler();
   return (
     <View style={{ gap: spacing.sm }}>
@@ -57,6 +73,7 @@ function Service({ name, what, service, state, children }: { name: string; what:
           {state.connected ? `Scrobbling as ${state.username ?? 'you'}. ${what}` : what}
         </Text>
       </View>
+      {state.connected ? extra : null}
       {state.connected ? (
         <View style={{ flexDirection: 'row' }}>
           <Button label={disconnect.isPending ? 'Disconnecting…' : 'Disconnect'} size="sm" variant="ghost" onPress={() => disconnect.mutate(service)} />
@@ -154,6 +171,28 @@ function TraktSignInButton() {
       <View style={{ flexDirection: 'row' }}>
         <Button label={signIn.state === 'starting' ? 'Starting…' : 'Connect Trakt'} size="sm" disabled={signIn.state === 'starting'} onPress={start} />
       </View>
+    </View>
+  );
+}
+
+/** One way, Jellyfin to Trakt: unwatched movies and shows on My List go on the Trakt watchlist. */
+function WatchlistToggle({ on }: { on: boolean }) {
+  const sync = useWatchlistSync();
+  const note = sync.isPending
+    ? on
+      ? 'Turning off…'
+      : 'Adding My List to your watchlist…'
+    : sync.error
+      ? sync.error.message
+      : sync.data?.status.traktWatchlistSync
+        ? `Added ${sync.data.added} title${sync.data.added === 1 ? '' : 's'} to your Trakt watchlist. From now on, My List keeps it up to date.`
+        : 'Unwatched movies and shows on My List go on your Trakt watchlist, and come off it when you remove them or finish watching.';
+  return (
+    <View style={{ gap: spacing.xs, alignItems: 'flex-start' }}>
+      <SelectChip label="Add My List to my Trakt watchlist" selected={on} onPress={() => !sync.isPending && sync.mutate(!on)} />
+      <Text variant="caption" tone="secondary" style={sync.error ? { color: colors.danger } : undefined}>
+        {note}
+      </Text>
     </View>
   );
 }

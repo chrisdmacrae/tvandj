@@ -8,6 +8,7 @@ import { trackLength, useAlbumTracks } from '@tv-and-j/core/jellyfin/music';
 import { useAuthedSession } from '@tv-and-j/core/state/SessionContext';
 import { Page } from '../../components/Page';
 import { tuneIn } from '../../lib/radio';
+import { ScrobbleButton } from '../../components/ScrobbleButton';
 import { useDownloadarr } from '@tv-and-j/core/downloadarr/hooks';
 
 /** An album: artwork, details, and its songs. Playing a song queues the rest of the album after it. */
@@ -42,6 +43,7 @@ export default function Album() {
             <View style={{ marginTop: spacing.sm, flexDirection: 'row', gap: spacing.sm }}>
               <Button label="Play" disabled={!tracks.length} onPress={() => play(0)} />
               {radioArtist ? <Button label="Artist radio" variant="secondary" onPress={() => tuneIn(radioArtist)} /> : null}
+              <ScrobbleButton itemId={album?.Id} itemType={album?.Type} />
             </View>
           </View>
         </View>

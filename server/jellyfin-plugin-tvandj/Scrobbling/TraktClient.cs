@@ -69,6 +69,28 @@ public class TraktClient(IHttpClientFactory httpClientFactory)
         return json.GetProperty("user").GetProperty("username").GetString()!;
     }
 
+    /// <summary>
+    /// Add to the person's watch history, as watched now: {"movies": […]} or {"shows": […]} (a whole show,
+    /// seasons, or episodes). Returns how many movies and episodes Trakt added; 0 means it didn't recognise them.
+    /// </summary>
+    public async Task<int> AddToHistory(string clientId, string accessToken, JsonObject body, CancellationToken ct)
+    {
+        var json = await Send(HttpMethod.Post, "sync/history", clientId, accessToken, body, ct).ConfigureAwait(false);
+        var added = json.GetProperty("added");
+        return added.GetProperty("movies").GetInt32() + added.GetProperty("episodes").GetInt32();
+    }
+
+    /// <summary>
+    /// Add to (or, with <paramref name="remove"/>, take off) the person's watchlist: {"movies": […], "shows": […]}.
+    /// Returns how many Trakt added or removed; titles already there (or not there) don't count.
+    /// </summary>
+    public async Task<int> Watchlist(string clientId, string accessToken, JsonObject body, bool remove, CancellationToken ct)
+    {
+        var json = await Send(HttpMethod.Post, remove ? "sync/watchlist/remove" : "sync/watchlist", clientId, accessToken, body, ct).ConfigureAwait(false);
+        var counts = json.GetProperty(remove ? "deleted" : "added");
+        return counts.GetProperty("movies").GetInt32() + counts.GetProperty("shows").GetInt32();
+    }
+
     public async Task Revoke(string clientId, string secret, string accessToken, CancellationToken ct)
     {
         var body = new JsonObject { ["token"] = accessToken, ["client_id"] = clientId, ["client_secret"] = secret };

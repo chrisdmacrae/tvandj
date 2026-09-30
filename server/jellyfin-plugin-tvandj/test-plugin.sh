@@ -69,4 +69,10 @@ echo "lastfm, bad key:          $(req POST /TvAndJ/Scrobbling/Lastfm '{"Username
 echo "trakt poll, no sign-in:   $(req POST /TvAndJ/Scrobbling/Trakt/Poll '' "$KID")"
 echo "disconnect lastfm:        HTTP $(code DELETE /TvAndJ/Scrobbling/lastfm '' "$KID")"
 echo "household kept:           $(req GET /TvAndJ/Household '' "$KID")"
+ROOT=$(req GET /Items/Root '' "$KID" | sed -E 's/.*"Id":"([^"]+)".*/\1/')
+echo "scrobble unknown item:    HTTP $(code POST /TvAndJ/Scrobbling/Items/00000000-0000-0000-0000-000000000001 '' "$KID")"
+echo "scrobble a folder:        $(req POST "/TvAndJ/Scrobbling/Items/$ROOT" '' "$KID" | sed -E 's/.*"detail":"([^"]+)".*/\1/')"
+echo "scrobble, no sign-in:     HTTP $(code POST "/TvAndJ/Scrobbling/Items/$ROOT")"
+echo "watchlist, no trakt:      $(req PUT /TvAndJ/Scrobbling/Trakt/Watchlist '{"Enabled":true}' "$KID" | sed -E 's/.*"detail":"([^"]+)".*/\1/')"
+echo "watchlist off:            $(req PUT /TvAndJ/Scrobbling/Trakt/Watchlist '{"Enabled":false}' "$KID")"
 echo "scrobbler running:        $("$DOCKER" logs "$NAME" 2>&1 | grep -ciE 'TvAndJ.*(error|exception)' | sed 's/^0$/no errors/')"

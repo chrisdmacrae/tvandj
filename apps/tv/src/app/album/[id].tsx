@@ -3,6 +3,7 @@ import { View } from 'react-native';
 import { Button, Text, spacing } from '@tv-and-j/design-system';
 import { DeleteButton } from '../../components/DeleteButton';
 import { tuneIn } from '../../lib/radio';
+import { ScrobbleButton } from '../../components/ScrobbleButton';
 import { useDownloadarr } from '@tv-and-j/core/downloadarr/hooks';
 import { MusicCollection } from '../../components/MusicCollection';
 import { posterUrl } from '@tv-and-j/core/jellyfin/images';
@@ -49,6 +50,7 @@ export default function Album() {
       actions={
         <>
           {radioArtist ? <Button label="Artist radio" size="md" variant="secondary" onPress={() => tuneIn(radioArtist)} /> : null}
+          <ScrobbleButton itemId={album?.Id} itemType={album?.Type} />
           <DeleteButton item={album} onDeleted={goBack} />
         </>
       }

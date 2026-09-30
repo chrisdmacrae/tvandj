@@ -31,7 +31,8 @@ public sealed class Scrobbler(
 
     private readonly ConcurrentDictionary<string, Play> _plays = new();
 
-    private sealed record Play(DateTimeOffset StartedAt, bool Paused);
+    /// <param name="Counted">Already scrobbled (music) or marked watched (Trakt): nothing more to send for this play.</param>
+    private sealed record Play(DateTimeOffset StartedAt, bool Paused, bool Counted);
 
     public Task StartAsync(CancellationToken cancellationToken)
     {
@@ -51,36 +52,57 @@ public sealed class Scrobbler(
 
     private static string Key(PlaybackProgressEventArgs e) => $"{e.Session?.Id}:{e.Item?.Id}";
 
+    /// <summary>Straight away: "now playing" on Last.fm and ListenBrainz, "watching" on Trakt.</summary>
     private void OnStart(object? sender, PlaybackProgressEventArgs e)
     {
         if (e.Item is null || e.Users.Count == 0) return;
-        _plays[Key(e)] = new Play(DateTimeOffset.UtcNow, e.IsPaused);
+        _plays[Key(e)] = new Play(DateTimeOffset.UtcNow, e.IsPaused, Counted: false);
         var position = e.PlaybackPositionTicks ?? 0;
         foreach (var user in e.Users.Select(u => u.Id))
         {
-            if (AsTrack(e.Item) is { } track) Run("now playing", () => NowPlaying(user, track));
+            if (AsTrack(e.Item) is { } track) NowPlaying(user, track);
             else if (AsTraktItem(e.Item) is { } item) Run("Trakt start", () => TraktScrobble(user, "start", item, ScrobbleRules.Progress(e.Item.RunTimeTicks, position, false)));
         }
     }
 
-    /// <summary>Trakt follows pauses: paused shows as paused there, resuming starts it again.</summary>
+    /// <summary>
+    /// Every progress report (about every 10 seconds): a song is scrobbled the moment it's played long
+    /// enough, and a movie or episode goes into Trakt's history the moment it passes 80%, rather than
+    /// when playback stops. Until then Trakt follows pauses: paused there, and watching again on resume.
+    /// </summary>
     private void OnProgress(object? sender, PlaybackProgressEventArgs e)
     {
-        if (e.Item is null || e.Users.Count == 0 || AsTraktItem(e.Item) is null) return;
+        if (e.Item is null || e.Users.Count == 0) return;
         var key = Key(e);
-        if (!_plays.TryGetValue(key, out var play) || play.Paused == e.IsPaused) return;
-        _plays[key] = play with { Paused = e.IsPaused };
-        var progress = ScrobbleRules.Progress(e.Item.RunTimeTicks, e.PlaybackPositionTicks ?? 0, false);
-        foreach (var user in e.Users.Select(u => u.Id))
+        if (!_plays.TryGetValue(key, out var play) || play.Counted) return;
+        var position = e.PlaybackPositionTicks ?? 0;
+
+        if (AsTrack(e.Item) is { } track)
         {
-            Run("Trakt pause", () => TraktScrobble(user, e.IsPaused ? "pause" : "start", AsTraktItem(e.Item)!, progress));
+            if (!ScrobbleRules.CountsAsListen(e.Item.RunTimeTicks, position, false) || !Claim(key, play, play with { Counted = true })) return;
+            foreach (var user in e.Users.Select(u => u.Id)) Listen(user, track, play.StartedAt);
+            return;
+        }
+
+        if (AsTraktItem(e.Item) is not { } item) return;
+        var progress = ScrobbleRules.Progress(e.Item.RunTimeTicks, position, false);
+        if (progress >= ScrobbleRules.TraktWatched)
+        {
+            if (!Claim(key, play, play with { Counted = true })) return;
+            foreach (var user in e.Users.Select(u => u.Id)) Run("Trakt watched", () => TraktScrobble(user, "stop", item, progress));
+        }
+        else if (play.Paused != e.IsPaused && Claim(key, play, play with { Paused = e.IsPaused }))
+        {
+            foreach (var user in e.Users.Select(u => u.Id)) Run("Trakt pause", () => TraktScrobble(user, e.IsPaused ? "pause" : "start", item, progress));
         }
     }
 
+    /// <summary>Whatever the progress reports didn't already count: a song that ended before its next report, or Trakt's stop.</summary>
     private void OnStopped(object? sender, PlaybackStopEventArgs e)
     {
         if (e.Item is null || e.Users.Count == 0) return;
         _plays.TryRemove(Key(e), out var play);
+        if (play?.Counted == true) return;
         var position = e.PlaybackPositionTicks ?? 0;
         foreach (var user in e.Users.Select(u => u.Id))
         {
@@ -88,38 +110,39 @@ public sealed class Scrobbler(
             {
                 // No start seen (e.g. the server restarted mid-song): assume it started that long ago.
                 var startedAt = play?.StartedAt ?? DateTimeOffset.UtcNow - TimeSpan.FromTicks(position);
-                if (ScrobbleRules.CountsAsListen(e.Item.RunTimeTicks, position, e.PlayedToCompletion))
-                {
-                    Run("scrobble", () => Listen(user, track, startedAt));
-                }
+                if (ScrobbleRules.CountsAsListen(e.Item.RunTimeTicks, position, e.PlayedToCompletion)) Listen(user, track, startedAt);
             }
             else if (AsTraktItem(e.Item) is { } item)
             {
-                // Under 80%, Trakt treats a stop as a pause; from 80% it's watched.
+                // Under 80%, Trakt keeps it as paused, to resume later; from 80% it's watched.
                 Run("Trakt stop", () => TraktScrobble(user, "stop", item, ScrobbleRules.Progress(e.Item.RunTimeTicks, position, e.PlayedToCompletion)));
             }
         }
     }
 
-    private async Task NowPlaying(Guid userId, Track track)
+    /// <summary>Move a play on to its next state, unless another report got there first (so nothing's sent twice).</summary>
+    private bool Claim(string key, Play seen, Play next) => _plays.TryUpdate(key, next, seen);
+
+    /// <summary>Each service separately, so one failing doesn't stop the other.</summary>
+    private void NowPlaying(Guid userId, Track track)
     {
         var account = accounts.Get(userId);
         var config = Plugin.Instance!.Configuration;
-        if (account.ListenBrainzToken is { } token) await listenBrainz.NowPlaying(token, track, CancellationToken.None).ConfigureAwait(false);
+        if (account.ListenBrainzToken is { } token) Run("ListenBrainz now playing", () => listenBrainz.NowPlaying(token, track, CancellationToken.None));
         if (account.LastfmSessionKey is { } sk && LastfmReady(config))
         {
-            await lastfm.NowPlaying(config.LastfmApiKey, config.LastfmApiSecret, sk, track, CancellationToken.None).ConfigureAwait(false);
+            Run("Last.fm now playing", () => lastfm.NowPlaying(config.LastfmApiKey, config.LastfmApiSecret, sk, track, CancellationToken.None));
         }
     }
 
-    private async Task Listen(Guid userId, Track track, DateTimeOffset startedAt)
+    private void Listen(Guid userId, Track track, DateTimeOffset startedAt)
     {
         var account = accounts.Get(userId);
         var config = Plugin.Instance!.Configuration;
-        if (account.ListenBrainzToken is { } token) await listenBrainz.Listen(token, track, startedAt, CancellationToken.None).ConfigureAwait(false);
+        if (account.ListenBrainzToken is { } token) Run("ListenBrainz listen", () => listenBrainz.Listen(token, track, startedAt, CancellationToken.None));
         if (account.LastfmSessionKey is { } sk && LastfmReady(config))
         {
-            await lastfm.Scrobble(config.LastfmApiKey, config.LastfmApiSecret, sk, track, startedAt, CancellationToken.None).ConfigureAwait(false);
+            Run("Last.fm scrobble", () => lastfm.Scrobble(config.LastfmApiKey, config.LastfmApiSecret, sk, track, startedAt, CancellationToken.None));
         }
     }
 
@@ -166,7 +189,7 @@ public sealed class Scrobbler(
         }
     });
 
-    private static Track? AsTrack(BaseItem item)
+    internal static Track? AsTrack(BaseItem item)
     {
         if (item is not Audio audio) return null;
         var artist = audio.Artists.FirstOrDefault() ?? audio.AlbumArtists.FirstOrDefault();
@@ -203,7 +226,7 @@ public sealed class Scrobbler(
         }
     }
 
-    private static JsonObject Ids(BaseItem item)
+    internal static JsonObject Ids(BaseItem item)
     {
         var ids = new JsonObject();
         if (int.TryParse(item.GetProviderId(MetadataProvider.Tmdb), NumberStyles.None, CultureInfo.InvariantCulture, out var tmdb)) ids["tmdb"] = tmdb;

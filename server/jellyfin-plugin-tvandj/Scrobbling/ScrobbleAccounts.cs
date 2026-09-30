@@ -22,6 +22,9 @@ public class ScrobbleAccount
 
     /// <summary>When the Trakt access token runs out (Unix seconds); it's refreshed a day before.</summary>
     public long TraktExpiresAt { get; set; }
+
+    /// <summary>Keep the Trakt watchlist in step with My List (unwatched movies and shows only). One way: Jellyfin to Trakt.</summary>
+    public bool TraktWatchlistSync { get; set; }
 }
 
 /// <summary>

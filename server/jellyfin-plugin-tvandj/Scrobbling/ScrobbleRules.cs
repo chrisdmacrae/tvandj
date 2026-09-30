@@ -19,6 +19,9 @@ public static class ScrobbleRules
         return playedToCompletion || playedTicks >= Math.Min(length / 2, 240 * TicksPerSecond);
     }
 
+    /// <summary>Trakt counts a movie or episode as watched from this far in (percent).</summary>
+    public const double TraktWatched = 80;
+
     /// <summary>Trakt's progress, 0–100. Trakt itself marks it watched from 80.</summary>
     public static double Progress(long? runTimeTicks, long positionTicks, bool playedToCompletion)
     {

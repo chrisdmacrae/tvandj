@@ -4,6 +4,8 @@ A Jellyfin plugin for the [TV and J](https://github.com/chrisdmacrae/tvandj) app
 
 It also scrobbles (1.1+): everyone connects their own Last.fm, ListenBrainz and Trakt accounts in TV and J's Settings, and whatever they play, in any Jellyfin app, is added to them. Songs go to Last.fm and ListenBrainz once they've played for half their length or 4 minutes; movies and episodes go to Trakt, live, with pauses (Trakt marks them watched from 80%).
 
+From 1.2, anything can be scrobbled by hand (a Scrobble button in the apps), and each person can have their My List kept on their Trakt watchlist: one way, Jellyfin to Trakt, unwatched movies and shows only. Turning it on adds what's on My List now; after that, adding a title adds it, and removing it or finishing it (a movie, or a show's last episode) takes it off the watchlist.
+
 Each person's own settings (request preferences, autoplay, theme music) don't need this plugin: the apps keep those in their Jellyfin account.
 
 ## Install
@@ -36,6 +38,8 @@ People's own sign-ins are stored in `scrobbling.json` in the plugin's data folde
 | `POST /TvAndJ/Scrobbling/ListenBrainz` | `{Token}`: the user's ListenBrainz token, checked with ListenBrainz first. |
 | `POST /TvAndJ/Scrobbling/Trakt/Code`, `…/Trakt/Poll` | Trakt's device sign-in: show the code, then poll until the person has entered it at trakt.tv/activate. |
 | `DELETE /TvAndJ/Scrobbling/{lastfm\|listenbrainz\|trakt}` | Disconnect (Trakt's token is revoked too). |
+| `PUT /TvAndJ/Scrobbling/Trakt/Watchlist` | `{Enabled}`: keep the Trakt watchlist in step with My List (1.2+). Turning it on adds what's on My List now and returns how many. |
+| `POST /TvAndJ/Scrobbling/Items/{itemId}` | Scrobble it now, played or not (1.2+): a song or album to Last.fm and ListenBrainz, as if just listened to; a movie, episode, season or show into Trakt's history. Returns what each service did. |
 
 The scrobbling endpoints act only on the signed-in user.
 
