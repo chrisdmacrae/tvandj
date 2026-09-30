@@ -286,6 +286,44 @@ async function route(method, url, body) {
     return ok({ lists: musicLists(), topArtists: [{ name: 'Test Artist', mbid: null, tasteWeight: 1 }] });
   }
 
+  // Album search: the recommendations plus a few catalog-only records, matched on artist or title.
+  if (path === '/music/search' && method === 'GET') {
+    const q = (url.searchParams.get('q') ?? '').toLowerCase();
+    if (!q) return fail(400, 'q is required');
+    const catalog = [
+      ...recommendations.map((r) => [r.artistName, r.albumTitle, r.releaseDate, 'album']),
+      ['Test Artist', 'Night Drive (Deluxe)', '2024-06-01', 'album'],
+      ['Test Artist', 'Midnight Single', '2025-02-14', 'single'],
+      ['Oslo Static', 'Southern Lines EP', '2018-05-05', 'ep'],
+    ];
+    return ok(
+      catalog
+        .filter(([artist, title]) => `${artist} ${title}`.toLowerCase().includes(q))
+        .map(([artistName, albumTitle, releaseDate, recordType], i) => ({
+          id: `deezer:${1000 + i}`,
+          artistName,
+          albumTitle,
+          coverUrl: cover(`${artistName}-${albumTitle}`),
+          recordType,
+          releaseDate,
+          source: 'deezer',
+        })),
+    );
+  }
+
+  // Albums like this: made-up related artists, one album each.
+  if (path === '/music/similar' && method === 'GET') {
+    const artist = url.searchParams.get('artist');
+    if (!artist || !url.searchParams.get('album')) return fail(400, 'artist and album are required');
+    const related = ['Velvet Arcade', 'Lumen Drift', 'Cedar & Salt', 'Northbound Choir'];
+    return ok(
+      related.map((artistName, i) => {
+        const albumTitle = ['Afterglow', 'Quiet Engines', 'Low Country', 'Hymns for Trains'][i];
+        return { id: `deezer:${2000 + i}`, artistName, albumTitle, coverUrl: cover(`${artistName}-${albumTitle}`), releaseDate: `${2015 + i}-03-01` };
+      }),
+    );
+  }
+
   if (path === '/music/preview' && method === 'GET') {
     const artist = url.searchParams.get('artist');
     const album = url.searchParams.get('album');

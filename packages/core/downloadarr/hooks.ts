@@ -14,6 +14,7 @@ import {
   type DownloadStatus,
   type MediaKind,
   type MusicDiscover,
+  type MusicSearchAlbum,
   type TorrentRequest,
 } from './client';
 import { showProgress, type TvProgress } from './tvStatus';
@@ -409,6 +410,44 @@ function musicDiscoverQuery(client: Downloadarr | null) {
 }
 
 /**
+ * Albums to request, by title or artist, leaving out what's already in
+ * Jellyfin. An older downloadarr without music search answers 404: no results, no retries.
+ */
+export function useMusicSearch(query: string) {
+  const client = useDownloadarr();
+  const library = useAlbumIndex();
+  const q = query.trim();
+  const search = useQuery({
+    queryKey: ['da', client?.baseUrl, 'music', 'search', q],
+    enabled: !!client && q.length >= 2,
+    staleTime: 5 * 60 * 1000,
+    retry: false,
+    queryFn: () => client!.searchMusic(q),
+  });
+  const albums = useMemo(
+    () => (search.data ?? []).filter((a) => !library.data?.[albumKey(a.artistName, a.albumTitle)]),
+    [search.data, library.data],
+  );
+  return { albums, isFetching: search.isFetching };
+}
+
+/**
+ * An album from a recent music search, for its cover and release date: the
+ * album page only gets artist and title. Undefined when no search has it.
+ */
+export function useSearchedAlbum(artist: string | undefined, album: string | undefined): MusicSearchAlbum | undefined {
+  const client = useDownloadarr();
+  const queryClient = useQueryClient();
+  if (!artist || !album) return undefined;
+  const key = albumKey(artist, album);
+  for (const [, results] of queryClient.getQueriesData<MusicSearchAlbum[]>({ queryKey: ['da', client?.baseUrl, 'music', 'search'] })) {
+    const found = results?.find((a) => albumKey(a.artistName, a.albumTitle) === key);
+    if (found) return found;
+  }
+  return undefined;
+}
+
+/**
  * An album's tracklist from Deezer, with 30-second preview clips, or null when
  * Deezer doesn't have it. The clip addresses are signed and expire after about
  * 15 minutes, so this goes stale well before that.
@@ -520,6 +559,48 @@ export function useArtistRadio(artist: string | undefined) {
     retry: false,
     queryFn: () => client!.artistRadio(artist!),
   });
+}
+
+const SIMILAR_LIMIT = 20;
+
+/**
+ * "Albums like this", by other artists, from two sources taken in turn:
+ * downloadarr's similar-albums lookup (related artists' albums closest in
+ * genre and era to this one) and the albums on the artist's radio station
+ * (Deezer's, and ListenBrainz's, mix of music like theirs). Either can be
+ * missing: an older downloadarr has no lookup (404, no retries), and a station
+ * takes a few seconds to build. Empty without downloadarr.
+ */
+export function useSimilarAlbums(album: { artistName: string; albumTitle: string } | undefined): AlbumRef[] {
+  const client = useDownloadarr();
+  const artist = album?.artistName;
+  const similar = useQuery({
+    queryKey: ['da', client?.baseUrl, 'music', 'similar', artist, album?.albumTitle],
+    enabled: !!client && !!album,
+    staleTime: 60 * 60 * 1000,
+    retry: false,
+    queryFn: () => client!.similarAlbums(album!.artistName, album!.albumTitle),
+  }).data;
+  const radio = useArtistRadio(artist).data;
+  return useMemo(() => {
+    if (!artist) return [];
+    const own = albumKey(artist, '');
+    const seen = new Set<string>();
+    const albums: AlbumRef[] = [];
+    const add = (a: { artistName: string; albumTitle: string; coverUrl?: string; releaseDate?: string }) => {
+      const key = albumKey(a.artistName, a.albumTitle);
+      if (albumKey(a.artistName, '') === own || seen.has(key)) return;
+      seen.add(key);
+      albums.push({ artistName: a.artistName, albumTitle: a.albumTitle, coverUrl: a.coverUrl, releaseDate: a.releaseDate });
+    };
+    const lookup = similar ?? [];
+    const station = radio?.albums ?? [];
+    for (let i = 0; i < Math.max(lookup.length, station.length); i++) {
+      if (lookup[i]) add(lookup[i]);
+      if (station[i]) add(station[i]);
+    }
+    return albums.slice(0, SIMILAR_LIMIT);
+  }, [artist, similar, radio]);
 }
 
 // ---- personal recommendations (Trakt) --------------------------------------------

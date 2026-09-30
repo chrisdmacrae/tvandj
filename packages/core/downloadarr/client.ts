@@ -147,6 +147,30 @@ export type AlbumPreview = {
   tracks: { id: number; title: string; artistName: string; durationSeconds: number; position?: number; previewUrl?: string }[];
 };
 
+/** An album from Deezer's catalog (or Spotify's, when a profile has it connected), as music search finds it. */
+export type MusicSearchAlbum = {
+  /** The provider's id, prefixed with the provider: "deezer:123". */
+  id: string;
+  artistName: string;
+  albumTitle: string;
+  coverUrl?: string;
+  /** album, ep, single or compile. Albums come first. */
+  recordType?: string;
+  releaseDate?: string;
+  /** Deezer albums have previews; Spotify-only ones usually don't. */
+  source: 'deezer' | 'spotify';
+};
+
+/** An album like another, from downloadarr's similar-albums lookup: a related artist's album closest in genre and era. */
+export type SimilarAlbum = {
+  /** "deezer:123". */
+  id: string;
+  artistName: string;
+  albumTitle: string;
+  coverUrl?: string;
+  releaseDate?: string;
+};
+
 /** A track on an artist radio station. */
 export type RadioTrack = {
   id: string;
@@ -369,6 +393,11 @@ export class Downloadarr {
     return this.call<MusicDiscover>('/music/discover');
   }
 
+  /** Albums by title or artist. Newer downloadarr only. */
+  searchMusic(query: string) {
+    return this.call<MusicSearchAlbum[]>(`/music/search?q=${encodeURIComponent(query)}`);
+  }
+
   /** An album's tracklist from Deezer; 404s when Deezer doesn't have it. */
   albumPreview(artist: string, album: string) {
     return this.call<AlbumPreview>(`/music/preview?artist=${encodeURIComponent(artist)}&album=${encodeURIComponent(album)}`);
@@ -377,6 +406,11 @@ export class Downloadarr {
   /** An artist radio station; 404s when Deezer and ListenBrainz have nothing for the artist. Takes a few seconds. */
   artistRadio(artist: string) {
     return this.call<ArtistRadio>(`/music/radio?artist=${encodeURIComponent(artist)}`);
+  }
+
+  /** Albums like this one, one per related artist. Newer downloadarr only. */
+  similarAlbums(artist: string, album: string) {
+    return this.call<SimilarAlbum[]>(`/music/similar?artist=${encodeURIComponent(artist)}&album=${encodeURIComponent(album)}`);
   }
 
   /** Stop recommending an album, or (without `album`) anything by the artist. */

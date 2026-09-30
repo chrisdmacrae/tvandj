@@ -12,6 +12,7 @@ import {
   useRecommendation,
   useRequestAlbum,
   useRetryRequest,
+  useSearchedAlbum,
   type MediaStatus,
 } from '@tv-and-j/core/downloadarr/hooks';
 import { formatSeconds, recommendationReason } from '@tv-and-j/core/downloadarr/music';
@@ -20,6 +21,7 @@ import { useAlbumPreviews } from '@tv-and-j/core/state/PreviewPlayer';
 import { GlowScreen } from '../../components/GlowScreen';
 import { PageHeader } from '../../components/PageHeader';
 import { RemoveRequestButton } from '../../components/RemoveRequestButton';
+import { SimilarAlbums } from '../../components/SimilarAlbums';
 import { tuneIn } from '../../lib/radio';
 
 const ART = 220;
@@ -34,12 +36,14 @@ export default function DiscoverAlbum() {
   const params = useLocalSearchParams<{ artist: string; album: string }>();
   const recommendation = useRecommendation(params.artist, params.album);
   const request = useAlbumRequest({ artistName: params.artist, albumTitle: params.album });
+  // Found through search: its cover and release date come from the results.
+  const searched = useSearchedAlbum(params.artist, params.album);
   const album: AlbumRef = recommendation ?? {
     artistName: params.artist,
     albumTitle: params.album,
     releaseGroupMbid: request?.musicbrainzId,
-    releaseDate: request?.year ? String(request.year) : null,
-    coverUrl: request?.posterUrl,
+    releaseDate: request?.year ? String(request.year) : (searched?.releaseDate ?? null),
+    coverUrl: request?.posterUrl ?? searched?.coverUrl,
   };
   const status = useAlbumStatus(album);
   const preview = useAlbumPreview(album);
@@ -115,6 +119,7 @@ export default function DiscoverAlbum() {
             })}
           </View>
         ) : null}
+        <SimilarAlbums album={album} />
       </ScrollView>
     </GlowScreen>
   );

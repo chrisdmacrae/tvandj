@@ -9,10 +9,11 @@ import { useAuthedSession } from '@tv-and-j/core/state/SessionContext';
 import { Page } from '../../components/Page';
 import { tuneIn } from '../../lib/radio';
 import { ScrobbleButton } from '../../components/ScrobbleButton';
+import { SimilarAlbums } from '../../components/SimilarAlbums';
 import { useDownloadarr } from '@tv-and-j/core/downloadarr/hooks';
 import { useMusic } from '../../music/MusicPlayer';
 
-/** An album: artwork, details, and its songs. Playing a song queues the album from there, and it plays on as you browse. */
+/** An album: artwork, details, its songs, and albums like it. Playing a song queues the album from there, and it plays on as you browse. */
 export default function Album() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { api } = useAuthedSession();
@@ -27,7 +28,8 @@ export default function Album() {
   };
   const art = album ? posterUrl(api, album, 600) : undefined;
   // downloadarr's artist radio: music like this that isn't in the library yet.
-  const radioArtist = useDownloadarr() ? (album?.AlbumArtists?.[0]?.Name ?? album?.AlbumArtist ?? undefined) : undefined;
+  const artistName = album?.AlbumArtists?.[0]?.Name ?? album?.AlbumArtist ?? undefined;
+  const radioArtist = useDownloadarr() ? artistName : undefined;
   const size = isPhone ? 180 : 240;
 
   return (
@@ -65,6 +67,7 @@ export default function Album() {
           ))}
         </View>
       </View>
+      <SimilarAlbums album={artistName && album?.Name ? { artistName, albumTitle: album.Name } : undefined} />
     </Page>
   );
 }

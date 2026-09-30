@@ -222,8 +222,10 @@ export function useEpisodes(seriesId: string | undefined, seasonId: string | und
   });
 }
 
+const SEARCH_TYPES = { movie: 'Movie', tv: 'Series', album: 'MusicAlbum' } as const satisfies Record<string, BaseItemKind>;
+
 /** Library titles matching a search, for the search screen. */
-export function useLibrarySearch(kind: 'movie' | 'tv', query: string) {
+export function useLibrarySearch(kind: keyof typeof SEARCH_TYPES, query: string) {
   const { api, auth } = useAuthedSession();
   const q = query.trim();
   return useQuery({
@@ -235,7 +237,7 @@ export function useLibrarySearch(kind: 'movie' | 'tv', query: string) {
         userId: auth.userId,
         recursive: true,
         searchTerm: q,
-        includeItemTypes: [kind === 'movie' ? 'Movie' : 'Series'],
+        includeItemTypes: [SEARCH_TYPES[kind]],
         limit: ROW_LIMIT,
         fields: CARD_FIELDS,
       });

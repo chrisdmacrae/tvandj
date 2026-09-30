@@ -25,10 +25,12 @@ type MusicCollectionProps = {
   numberByPosition?: boolean;
   /** Extra actions after Play / Shuffle / Instant Mix (e.g. Delete). */
   actions?: ReactNode;
+  /** Below the songs, full width (e.g. a row of albums like this). */
+  footer?: ReactNode;
 };
 
 /** An album or playlist: artwork and details, Play / Shuffle / Instant Mix, then the songs. */
-export function MusicCollection({ item, artUri, title, details, tracks, showArtist, numberByPosition, actions }: MusicCollectionProps) {
+export function MusicCollection({ item, artUri, title, details, tracks, showArtist, numberByPosition, actions, footer }: MusicCollectionProps) {
   const { api, auth } = useAuthedSession();
   const music = useMusic();
   const play = (options: { startIndex?: number; shuffle?: boolean }) => {
@@ -71,6 +73,7 @@ export function MusicCollection({ item, artUri, title, details, tracks, showArti
         ) : (
           <ActivityIndicator color={colors.accent} />
         )}
+        {footer}
       </ScrollView>
     </GlowScreen>
   );
