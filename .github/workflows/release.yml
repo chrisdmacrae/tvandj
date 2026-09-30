@@ -1,0 +1,103 @@
+# Cuts a TV and J release. Bump "version" in apps/tv/app.json, commit, then push a matching tag:
+#
+#   git tag v1.0.5 && git push origin v1.0.5
+#
+# That builds the Fire TV / Android TV APK and the web app's Docker image, and publishes both as
+# one GitHub Release, "TV and J 1.0.5", marked Latest:
+#   - the APK, as tv-and-j-1.0.5.apk and tv-and-j.apk (so releases/latest/download/tv-and-j.apk
+#     always gets the newest one);
+#   - ghcr.io/<owner>/<repo>-pwa:1.0.5 and :latest, which deploy/setup.sh installs.
+# The Jellyfin plugin has its own releases (plugin-release.yml, plugin-v* tags).
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  version:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      version: ${{ steps.check.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: check
+        name: Tag matches apps/tv/app.json
+        run: |
+          VERSION=$(node -p "require('./apps/tv/app.json').expo.version")
+          if [ "${GITHUB_REF_NAME#v}" != "$VERSION" ]; then
+            echo "::error::Tag $GITHUB_REF_NAME doesn't match apps/tv/app.json version $VERSION. Bump it there first."
+            exit 1
+          fi
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+  apk:
+    needs: version
+    permissions:
+      contents: read
+    uses: ./.github/workflows/android-apk.yml
+    secrets: inherit
+
+  image:
+    needs: version
+    permissions:
+      contents: read
+      packages: write
+    uses: ./.github/workflows/pwa-image.yml
+    with:
+      version: ${{ needs.version.outputs.version }}
+    secrets: inherit
+
+  release:
+    needs: [version, apk, image]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    env:
+      VERSION: ${{ needs.version.outputs.version }}
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: tv-and-j-apk
+
+      - name: Release notes
+        run: |
+          # The image name as the image workflow pushes it: ghcr.io/<owner>/<repo>-pwa, lower-cased.
+          IMAGE="ghcr.io/$(echo "$GITHUB_REPOSITORY" | tr '[:upper:]' '[:lower:]')-pwa"
+          RAW="https://raw.githubusercontent.com/$GITHUB_REPOSITORY/$GITHUB_REF_NAME"
+          DOWNLOAD="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/releases/download/$GITHUB_REF_NAME"
+          cat > notes.md <<NOTES
+          ## Fire TV / Android TV
+
+          With ADB debugging on and the TV connected (\`adb connect <tv-ip>:5555\`):
+
+          \`\`\`sh
+          curl -fL $DOWNLOAD/tv-and-j.apk -o /tmp/tv-and-j.apk && adb install -r /tmp/tv-and-j.apk
+          \`\`\`
+
+          ## Web app (phones, tablets, computers)
+
+          Docker image: \`$IMAGE:$VERSION\` (also \`:latest\`), for amd64 and arm64.
+
+          On a Linux box with Docker, set it up (or update it) with:
+
+          \`\`\`sh
+          curl -fsSL $RAW/deploy/setup.sh | TVANDJ_REF=$GITHUB_REF_NAME bash
+          \`\`\`
+
+          NOTES
+
+      - name: Publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          cp "tv-and-j-$VERSION.apk" tv-and-j.apk
+          gh release create "$GITHUB_REF_NAME" "tv-and-j-$VERSION.apk" tv-and-j.apk \
+            --repo "$GITHUB_REPOSITORY" --title "TV and J $VERSION" --latest \
+            --notes-file notes.md --generate-notes

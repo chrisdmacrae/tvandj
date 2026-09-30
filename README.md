@@ -22,13 +22,13 @@ adb connect 192.168.1.50:5555   # your TV's IP address; accept the prompt on the
 ```
 
 ```sh
-url=$(curl -fsSL https://api.github.com/repos/chrisdmacrae/tvandj/releases | grep -o 'https://[^"]*/tv-and-j-[^"]*\.apk' | head -1) && curl -fL "${url:?No TV and J release yet}" -o /tmp/tv-and-j.apk && adb install -r /tmp/tv-and-j.apk
+curl -fL https://github.com/chrisdmacrae/tvandj/releases/latest/download/tv-and-j.apk -o /tmp/tv-and-j.apk && adb install -r /tmp/tv-and-j.apk
 ```
 
-It picks the newest release with an APK attached (the repository's releases also include the Jellyfin
-plugin's, so GitHub's "latest" link isn't the app), downloads it and installs it. Run it again to update:
-`-r` keeps your sign-in and settings. With more than one device connected, add `-s 192.168.1.50:5555`
-after `adb`. Releases come from pushing a `tv-v<version>` tag (see `.github/workflows/android-apk.yml`).
+It downloads the latest release's APK and installs it. Run it again to update: `-r` keeps your sign-in
+and settings. With more than one device connected, add `-s 192.168.1.50:5555` after `adb`. Every
+release is on the [releases page](https://github.com/chrisdmacrae/tvandj/releases), with the APK and
+the web app's Docker image.
 
 ## Getting started
 
@@ -68,6 +68,23 @@ of the script goes in the folder to manage it:
   `TVANDJ_REF=<branch or tag>` takes the files from somewhere other than `main`.
 - To build the image yourself (e.g. with an OMDb key baked in): `docker build -f apps/pwa/Dockerfile .`
   from a checkout, then set `PWA_IMAGE` in the install folder's `.env`.
+
+## Releasing
+
+The TV app and the web app are released together, as one version:
+
+1. Bump `"version"` in `apps/tv/app.json` and commit it.
+2. Tag and push: `git tag v1.0.5 && git push origin v1.0.5`.
+
+`.github/workflows/release.yml` checks the tag matches, builds the APK and the Docker image, and
+publishes a GitHub Release, "TV and J 1.0.5", marked Latest, with:
+
+- `tv-and-j-1.0.5.apk`, and `tv-and-j.apk` for the `releases/latest/download/tv-and-j.apk` link above;
+- `ghcr.io/chrisdmacrae/tvandj-pwa:1.0.5` and `:latest` (what `deploy/setup.sh` installs).
+
+Pushes to `main` still build both: the APK as a workflow artifact, the image as `:main`. The Jellyfin
+plugin is released on its own, with `plugin-v<version>` tags (see its README); those releases never
+take the Latest spot.
 
 ## Local Jellyfin for development
 

@@ -1,12 +1,19 @@
 # Builds the PWA's Docker image (static files behind nginx, see apps/pwa/Dockerfile) and pushes
-# it to GitHub Container Registry: ghcr.io/<owner>/<repo>-pwa, tagged `latest` and with the commit
-# from main, and with the version from tags like pwa-v1.2.0. Pull requests build without pushing.
+# it to GitHub Container Registry: ghcr.io/<owner>/<repo>-pwa. Pushes to main are tagged `main`
+# and with the commit; releases (release.yml, a v<version> tag) call this with the version, and
+# tag it with that and `latest`, which is what deploy/setup.sh installs. Pull requests build
+# without pushing.
 name: PWA image
 
 on:
+  workflow_call:
+    inputs:
+      version:
+        description: The release's version, e.g. 1.0.5; tagged along with `latest`.
+        type: string
+        required: true
   push:
     branches: [main]
-    tags: ['pwa-v*']
     paths:
       - 'apps/pwa/**'
       - 'packages/**'
@@ -26,7 +33,8 @@ permissions:
   packages: write
 
 concurrency:
-  group: pwa-image-${{ github.ref }}
+  # Its own group when a release calls it, so the two don't cancel each other.
+  group: pwa-image-${{ github.ref }}-${{ github.workflow }}
   cancel-in-progress: true
 
 jobs:
@@ -50,9 +58,10 @@ jobs:
         with:
           images: ghcr.io/${{ github.repository }}-pwa
           tags: |
-            type=raw,value=latest,enable={{is_default_branch}}
-            type=sha,enable={{is_default_branch}}
-            type=match,pattern=pwa-v(.*),group=1
+            type=raw,value=main,enable=${{ github.ref == 'refs/heads/main' }}
+            type=sha,enable=${{ github.ref == 'refs/heads/main' }}
+            type=raw,value=${{ inputs.version }},enable=${{ inputs.version != null && inputs.version != '' }}
+            type=raw,value=latest,enable=${{ inputs.version != null && inputs.version != '' }}
             type=ref,event=pr
 
       - uses: docker/build-push-action@v6

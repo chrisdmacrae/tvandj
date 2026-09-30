@@ -41,8 +41,9 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release create "$GITHUB_REF_NAME" "out/tvandj_$VERSION.zip" \
-            --title "Jellyfin plugin $VERSION" --notes "TV and J household settings plugin $VERSION, for Jellyfin 12.1."
+          # Not "Latest": that's kept for the app's releases, so releases/latest/download/tv-and-j.apk works.
+          gh release create "$GITHUB_REF_NAME" "out/tvandj_$VERSION.zip" --latest=false \
+            --title "Jellyfin plugin $VERSION" --notes "TV and J plugin $VERSION (household settings and scrobbling), for Jellyfin 12.1."
 
       - name: Update manifest.json
         run: |
