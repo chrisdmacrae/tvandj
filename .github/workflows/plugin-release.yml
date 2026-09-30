@@ -1,0 +1,55 @@
+# Publishes the Jellyfin plugin (server/jellyfin-plugin-tvandj). Push a tag like
+# plugin-v1.0.1 and this builds it, attaches the zip to a GitHub Release, and adds the
+# version to the plugin repository file Jellyfin reads:
+# https://raw.githubusercontent.com/<owner>/<repo>/main/server/jellyfin-plugin-tvandj/manifest.json
+name: Plugin release
+
+on:
+  push:
+    tags: ['plugin-v*']
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: server/jellyfin-plugin-tvandj
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Build
+        run: |
+          TAG=${GITHUB_REF_NAME#plugin-v}
+          VERSION=$(echo "$TAG.0.0.0" | cut -d. -f1-4)
+          echo "VERSION=$VERSION" >> "$GITHUB_ENV"
+          dotnet publish Jellyfin.Plugin.TvAndJ.csproj -c Release -o "out/TVandJ_$VERSION" \
+            -p:AssemblyVersion=$VERSION -p:FileVersion=$VERSION
+          # Only our assembly: Jellyfin provides its own libraries.
+          find "out/TVandJ_$VERSION" -type f ! -name 'Jellyfin.Plugin.TvAndJ.dll' -delete
+          (cd out && zip -qr "tvandj_$VERSION.zip" "TVandJ_$VERSION")
+
+      - name: Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" "out/tvandj_$VERSION.zip" \
+            --title "Jellyfin plugin $VERSION" --notes "TV and J household settings plugin $VERSION, for Jellyfin 12.1."
+
+      - name: Update manifest.json
+        run: |
+          URL="https://github.com/${GITHUB_REPOSITORY}/releases/download/${GITHUB_REF_NAME}/tvandj_${VERSION}.zip"
+          node make-manifest.mjs "$VERSION" "out/tvandj_$VERSION.zip" "$URL" "${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/releases/tag/${GITHUB_REF_NAME}"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898+github-actions[bot]@users.noreply.github.com"
+          git add manifest.json
+          git commit -m "Plugin repository: add $VERSION"
+          git push origin main

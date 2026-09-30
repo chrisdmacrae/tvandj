@@ -1,6 +1,6 @@
 import { ActivityIndicator, ScrollView, TVFocusGuideView, View } from 'react-native';
 import { ListItem, Text, colors, radii, safeArea, spacing } from '@tv-and-j/design-system';
-import type { Stream, Track } from '../jellyfin/playback';
+import type { Stream, Track } from '@tv-and-j/core/jellyfin/playback';
 
 const FocusGuide = TVFocusGuideView ?? View;
 

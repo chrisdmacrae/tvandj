@@ -1,6 +1,7 @@
 import type { ReactElement } from 'react';
 import { FlatList, View, type ListRenderItem } from 'react-native';
-import { safeArea, spacing } from '../tokens';
+import { useLayout } from '../layout';
+import { spacing } from '../tokens';
 import { Text } from './Text';
 
 export type ShelfProps<T> = {
@@ -12,9 +13,10 @@ export type ShelfProps<T> = {
 
 /** A titled, horizontally scrolling row — the core browse pattern on TV. */
 export function Shelf<T>({ title, data, renderItem, keyExtractor }: ShelfProps<T>): ReactElement {
+  const { gutter } = useLayout();
   return (
     <View style={{ marginBottom: spacing.xl }}>
-      <Text variant="title" style={{ marginHorizontal: safeArea.horizontal, marginBottom: spacing.md }}>
+      <Text variant="title" style={{ marginHorizontal: gutter, marginBottom: spacing.md }}>
         {title}
       </Text>
       <FlatList
@@ -29,7 +31,7 @@ export function Shelf<T>({ title, data, renderItem, keyExtractor }: ShelfProps<T
         windowSize={5}
         // Vertical padding leaves room for the focus zoom so cards aren't clipped.
         contentContainerStyle={{
-          paddingHorizontal: safeArea.horizontal,
+          paddingHorizontal: gutter,
           paddingVertical: spacing.md,
           gap: spacing.lg,
         }}

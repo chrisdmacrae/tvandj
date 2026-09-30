@@ -4,9 +4,9 @@ import { useEffect, useState, type ReactNode } from 'react';
 import { ActivityIndicator, ScrollView, View } from 'react-native';
 import { AvatarButton, ListItem, Text, colors, radii, spacing } from '@tv-and-j/design-system';
 import { WizardStep } from '../../components/WizardStep';
-import { pollQuickConnect, startQuickConnect, type QuickConnectSession } from '../../jellyfin/auth';
-import { fetchPublicUsers, userAvatarUrl } from '../../jellyfin/users';
-import { useSession } from '../../state/SessionContext';
+import { pollQuickConnect, startQuickConnect, type QuickConnectSession } from '@tv-and-j/core/jellyfin/auth';
+import { fetchPublicUsers, userAvatarUrl } from '@tv-and-j/core/jellyfin/users';
+import { useSession } from '@tv-and-j/core/state/SessionContext';
 
 type State =
   | { status: 'starting' }

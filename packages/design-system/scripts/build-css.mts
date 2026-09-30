@@ -11,6 +11,9 @@ for (const [k, val] of Object.entries(tokens.colors)) v(`color-${kebab(k)}`, val
 for (const [k, val] of Object.entries(tokens.spacing)) v(`space-${k}`, `${val}px`);
 for (const [k, val] of Object.entries(tokens.safeArea)) v(`safe-${k}`, `${val}px`);
 for (const [k, val] of Object.entries(tokens.radii)) v(`radius-${k}`, `${val}px`);
+// Breakpoints can't drive media queries from custom properties; these document the numbers for previews.
+for (const [k, val] of Object.entries(tokens.breakpoints)) v(`breakpoint-${k}`, `${val}px`);
+for (const [k, val] of Object.entries(tokens.gutters)) v(`gutter-${k}`, `${val}px`);
 for (const [k, t] of Object.entries(tokens.typography)) {
   v(`type-${k}-size`, `${t.fontSize}px`);
   v(`type-${k}-line`, `${t.lineHeight}px`);

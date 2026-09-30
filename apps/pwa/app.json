@@ -1,0 +1,26 @@
+{
+  "expo": {
+    "name": "TV and J",
+    "slug": "tv-and-j-pwa",
+    "scheme": "tvandj-web",
+    "userInterfaceStyle": "dark",
+    "platforms": [
+      "web"
+    ],
+    "web": {
+      "bundler": "metro",
+      "output": "single",
+      "favicon": "./public/icons/icon-192.png",
+      "name": "TV and J",
+      "shortName": "TV and J",
+      "themeColor": "#0B0D12",
+      "backgroundColor": "#0B0D12"
+    },
+    "plugins": [
+      "expo-router"
+    ],
+    "experiments": {
+      "typedRoutes": false
+    }
+  }
+}

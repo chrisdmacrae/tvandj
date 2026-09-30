@@ -2,9 +2,9 @@ import type { BaseItemDto } from '@jellyfin/sdk/lib/generated-client/models';
 import { useQueryClient } from '@tanstack/react-query';
 import { createVideoPlayer, type VideoPlayer } from 'expo-video';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { audioCodecs } from '../../modules/jellyfin-discovery/capabilities';
-import { report, resolveStream, stopTranscode, type Stream, type StreamOptions } from '../jellyfin/playback';
-import { useAuthedSession } from '../state/SessionContext';
+import { audioCodecs } from '@tv-and-j/core/platform';
+import { report, resolveStream, stopTranscode, type Stream, type StreamOptions } from '@tv-and-j/core/jellyfin/playback';
+import { useAuthedSession } from '@tv-and-j/core/state/SessionContext';
 
 const PROGRESS_INTERVAL_MS = 10_000;
 const VOLUME_STEP = 0.1;

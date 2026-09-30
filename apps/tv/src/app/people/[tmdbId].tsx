@@ -5,8 +5,8 @@ import { DiscoverCard } from '../../components/DiscoverCard';
 import { GlowScreen } from '../../components/GlowScreen';
 import { CardGrid } from '../../components/ItemGrid';
 import { PageHeader } from '../../components/PageHeader';
-import type { MediaKind } from '../../downloadarr/client';
-import { requestKey, usePersonDetails } from '../../downloadarr/hooks';
+import type { MediaKind } from '@tv-and-j/core/downloadarr/client';
+import { requestKey, usePersonDetails } from '@tv-and-j/core/downloadarr/hooks';
 
 const PHOTO = 112;
 

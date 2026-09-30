@@ -3,7 +3,7 @@ import { getLibraryApi } from '@jellyfin/sdk/lib/utils/api';
 import { useQuery } from '@tanstack/react-query';
 import { createVideoPlayer, type VideoPlayer } from 'expo-video';
 import { useEffect, useRef } from 'react';
-import { useAuthedSession } from '../state/SessionContext';
+import { useAuthedSession } from '@tv-and-j/core/state/SessionContext';
 
 const VOLUME = 0.5;
 const FADE_MS = 1500;

@@ -2,7 +2,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useEffect, useRef } from 'react';
 import { WebView, type WebViewMessageEvent } from 'react-native-webview';
 import { colors } from '@tv-and-j/design-system';
-import { TRAILER_IN_FLIGHT_KEY } from '../state/SettingsContext';
+import { TRAILER_IN_FLIGHT_KEY } from '@tv-and-j/core/state/SettingsContext';
 
 /**
  * YouTube needs to know which site is embedding it (it refuses to play, with

@@ -2,7 +2,7 @@ import { Redirect, router } from 'expo-router';
 import { Button } from '@tv-and-j/design-system';
 import { isDiscoverySupported } from '../../../modules/jellyfin-discovery';
 import { WizardStep } from '../../components/WizardStep';
-import { useSession } from '../../state/SessionContext';
+import { useSession } from '@tv-and-j/core/state/SessionContext';
 
 export default function Welcome() {
   const { server } = useSession();

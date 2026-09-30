@@ -3,11 +3,15 @@
 Jellyfin client for Fire TV. npm workspaces monorepo:
 
 - `apps/tv` — Expo + react-native-tvos app. See `apps/tv/AGENTS.md` for Expo rules (use `npx expo install`, never hand-edit `android/`/`ios/`).
-- `packages/design-system` — all UI primitives and tokens. See its README.
+- `apps/pwa` — the same app for phones, tablets and desktop browsers: Expo Router on react-native-web, installable (manifest, service worker, iOS home-screen tags in `public/`). `npm run pwa` / `npm run build:pwa`.
+- `packages/core` — everything the apps share that isn't UI: Jellyfin/downloadarr data, sign-in, profiles, settings. Imported by path (`@tv-and-j/core/jellyfin/library`). Device capabilities come in through `platform.ts` (`configurePlatform`), never native imports.
+- `packages/design-system` — all UI primitives and tokens, shared by both apps. See its README.
 
 Rules:
 - UI values (colors, spacing, type, focus) come from `@tv-and-j/design-system` tokens, never literals in the app.
 - Every interactive element is built on `Focusable` (D-pad focus). Test navigation with the remote, not touch.
+- Layout follows `useLayout()` (tv / phone / tablet / desktop): use its `gutter`, not `safeArea`, for side margins in shared components. A TV is always `tv`; the rest go by width.
+- The root `react-native` must stay `npm:react-native-tvos@0.86-stable`: a plain `react-native` there replaces the TV fork for the TV app too (the PWA doesn't care: on web it's react-native-web).
 - After changing `src/tokens`, run `npm run build:css -w @tv-and-j/design-system` and update the matching `design/` preview.
 - Run `npm run typecheck` before declaring work done.
 

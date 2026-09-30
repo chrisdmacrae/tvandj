@@ -2,8 +2,8 @@ import type { BaseItemDto } from '@jellyfin/sdk/lib/generated-client/models';
 import { Image } from 'expo-image';
 import { View } from 'react-native';
 import { Button, ProgressBar, Text, colors, radii, safeArea, spacing } from '@tv-and-j/design-system';
-import { landscapeUrl } from '../jellyfin/images';
-import { useAuthedSession } from '../state/SessionContext';
+import { landscapeUrl } from '@tv-and-j/core/jellyfin/images';
+import { useAuthedSession } from '@tv-and-j/core/state/SessionContext';
 
 const THUMB_WIDTH = 200;
 

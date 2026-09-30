@@ -1,6 +1,11 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { createContext, use, useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { createContext, use, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { AppState } from 'react-native';
 import { useSession } from './SessionContext';
+import { pullSettings, pushSettings } from './settingsSync';
+
+/** Wait for a burst of changes (tapping through chips) to settle before saving to Jellyfin. */
+const PUSH_DELAY_MS = 1000;
 
 const SETTINGS_KEY = 'tv-and-j/settings';
 
@@ -79,8 +84,15 @@ function split(settings: Settings): { device: DeviceSettings; profile: ProfileSe
   };
 }
 
+/** Anything saved: a profile's settings, the device's, or the older all-in-one shape. */
+type StoredSettings = Omit<Partial<Settings>, 'request' | 'playback'> & {
+  request?: Partial<Settings['request']>;
+  playback?: Partial<Settings['playback']>;
+  trailers?: boolean;
+};
+
 /** Stored settings (either kind, or the older all-in-one shape) over the defaults. */
-function withDefaults(stored: Partial<Settings> & { trailers?: boolean }): Settings {
+function withDefaults(stored: StoredSettings): Settings {
   return {
     ...DEFAULT_SETTINGS,
     ...stored,
@@ -93,20 +105,59 @@ function withDefaults(stored: Partial<Settings> & { trailers?: boolean }): Setti
   };
 }
 
+/** A profile's settings as saved on this device, stamped with when they last changed (0: before syncing). */
+type StoredProfile = ProfileSettings & { updatedAt?: number };
+
 /**
  * Settings for whoever's watching. Request preferences and playback habits
- * belong to each profile; the downloadarr address and trailer support belong
- * to the TV. A profile with nothing saved yet starts from the TV's older
- * all-in-one settings while they're still there, so the switch to per-profile
- * settings doesn't reset them.
+ * belong to each profile and sync through their Jellyfin account (see
+ * settingsSync), so they follow them between the TV, the web app and other
+ * devices; the newest copy wins. The downloadarr address, trailer support and
+ * the screensaver belong to this device and stay here.
+ *
+ * The local copy loads first so nothing waits on the network; Jellyfin's copy
+ * replaces it if newer, on load and whenever the app comes back to the front.
+ * A profile with nothing saved yet starts from the device's older all-in-one
+ * settings while they're still there.
  */
 export function SettingsProvider({ children }: { children: ReactNode }) {
-  const userId = useSession().auth?.userId ?? null;
+  const { api, auth } = useSession();
+  const userId = auth?.userId ?? null;
   const [settings, setSettings] = useState<Settings>(DEFAULT_SETTINGS);
   const [ready, setReady] = useState(false);
+  // When this profile's settings last changed, here or elsewhere.
+  const updatedAt = useRef(0);
+  const apiRef = useRef(api);
+  apiRef.current = api;
+
+  /** Take Jellyfin's copy of this profile's settings if it's newer than ours. */
+  const pull = useCallback(async () => {
+    const current = apiRef.current;
+    if (!current || !userId) return;
+    const remote = await pullSettings<ProfileSettings>(current, userId);
+    if (!remote) {
+      // Nothing on the server yet: put ours there, if they've ever changed.
+      if (updatedAt.current) {
+        setSettings((prev) => {
+          pushSettings(current, userId, { value: split(prev).profile, updatedAt: updatedAt.current });
+          return prev;
+        });
+      }
+      return;
+    }
+    if (remote.updatedAt <= updatedAt.current) return;
+    updatedAt.current = remote.updatedAt;
+    setSettings((prev) => {
+      const profile = split(withDefaults(remote.value)).profile;
+      const stored: StoredProfile = { ...profile, updatedAt: remote.updatedAt };
+      AsyncStorage.setItem(profileKey(userId), JSON.stringify(stored)).catch(() => {});
+      return combine(split(prev).device, profile);
+    });
+  }, [userId]);
 
   useEffect(() => {
     let cancelled = false;
+    updatedAt.current = 0;
     Promise.all([
       AsyncStorage.getItem(SETTINGS_KEY),
       userId ? AsyncStorage.getItem(profileKey(userId)) : Promise.resolve(null),
@@ -115,7 +166,9 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
       .then(([rawDevice, rawProfile, trailerCrashed]) => {
         if (cancelled) return;
         const device = withDefaults(rawDevice ? JSON.parse(rawDevice) : {});
-        const profile = rawProfile ? withDefaults(JSON.parse(rawProfile)) : device;
+        const storedProfile: StoredProfile | null = rawProfile ? JSON.parse(rawProfile) : null;
+        const profile = storedProfile ? withDefaults(storedProfile) : device;
+        updatedAt.current = storedProfile?.updatedAt ?? 0;
         const loaded = combine(split(device).device, split(profile).profile);
         if (trailerCrashed) {
           loaded.playback = { ...loaded.playback, trailers: false };
@@ -125,19 +178,44 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
         setSettings(loaded);
       })
       .catch(() => {})
-      .finally(() => !cancelled && setReady(true));
+      .finally(() => {
+        if (cancelled) return;
+        setReady(true);
+        pull();
+      });
     return () => {
       cancelled = true;
     };
-  }, [userId]);
+  }, [userId, pull]);
+
+  // Back in front (e.g. after changing something on the phone): pick up what changed elsewhere.
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', (state) => state === 'active' && pull());
+    return () => sub.remove();
+  }, [pull]);
+
+  const pushTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
+  useEffect(() => () => clearTimeout(pushTimer.current), []);
 
   const update = useCallback(
     async (patch: Partial<Settings>) => {
       setSettings((prev) => {
         const next = { ...prev, ...patch };
+        const before = split(prev);
         const { device, profile } = split(next);
         AsyncStorage.setItem(SETTINGS_KEY, JSON.stringify(device)).catch(() => {});
-        if (userId) AsyncStorage.setItem(profileKey(userId), JSON.stringify(profile)).catch(() => {});
+        if (userId && JSON.stringify(profile) !== JSON.stringify(before.profile)) {
+          // A change to this person's settings: stamp it, keep it here, and send it to Jellyfin.
+          const stamp = Date.now();
+          updatedAt.current = stamp;
+          const stored: StoredProfile = { ...profile, updatedAt: stamp };
+          AsyncStorage.setItem(profileKey(userId), JSON.stringify(stored)).catch(() => {});
+          clearTimeout(pushTimer.current);
+          pushTimer.current = setTimeout(() => {
+            const current = apiRef.current;
+            if (current) pushSettings(current, userId, { value: profile, updatedAt: stamp });
+          }, PUSH_DELAY_MS);
+        }
         return next;
       });
     },

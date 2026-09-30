@@ -1,7 +1,7 @@
 import { router } from 'expo-router';
 import { AvatarButton } from '@tv-and-j/design-system';
-import { userAvatarUrl, useServerUsers } from '../jellyfin/users';
-import { useAuthedSession } from '../state/SessionContext';
+import { userAvatarUrl, useServerUsers } from '@tv-and-j/core/jellyfin/users';
+import { useAuthedSession } from '@tv-and-j/core/state/SessionContext';
 
 /** The current profile's avatar in the top bar; opens "Who's watching?". */
 export function UserSwitcher() {

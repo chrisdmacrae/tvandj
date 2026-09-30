@@ -5,7 +5,7 @@ import { useEffect, useRef, useState } from 'react';
 import { View } from 'react-native';
 import { Text, colors, radii, safeArea, spacing } from '@tv-and-j/design-system';
 import { useMusic } from '../music/MusicPlayer';
-import { useAuthedSession } from '../state/SessionContext';
+import { useAuthedSession } from '@tv-and-j/core/state/SessionContext';
 
 const TICKS_PER_SECOND = 10_000_000;
 const RECONNECT_MIN_MS = 2_000;

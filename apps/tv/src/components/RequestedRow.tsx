@@ -1,6 +1,6 @@
 import { Shelf } from '@tv-and-j/design-system';
-import type { DiscoverItem, MediaKind } from '../downloadarr/client';
-import { requestKey } from '../downloadarr/hooks';
+import type { DiscoverItem, MediaKind } from '@tv-and-j/core/downloadarr/client';
+import { requestKey } from '@tv-and-j/core/downloadarr/hooks';
 import { DiscoverCard } from './DiscoverCard';
 
 type RequestedRowProps = {

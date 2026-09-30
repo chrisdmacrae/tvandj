@@ -1,10 +1,10 @@
 import { useLocalSearchParams } from 'expo-router';
 import { Text } from '@tv-and-j/design-system';
 import { MusicCollection } from '../../components/MusicCollection';
-import { posterUrl } from '../../jellyfin/images';
-import { useItem } from '../../jellyfin/library';
-import { usePlaylistItems } from '../../jellyfin/music';
-import { useAuthedSession } from '../../state/SessionContext';
+import { posterUrl } from '@tv-and-j/core/jellyfin/images';
+import { useItem } from '@tv-and-j/core/jellyfin/library';
+import { usePlaylistItems } from '@tv-and-j/core/jellyfin/music';
+import { useAuthedSession } from '@tv-and-j/core/state/SessionContext';
 
 /** A music playlist: its songs in order, with Play / Shuffle / Instant Mix. */
 export default function Playlist() {

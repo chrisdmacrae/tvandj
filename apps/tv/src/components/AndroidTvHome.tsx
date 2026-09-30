@@ -1,8 +1,8 @@
 import { useEffect } from 'react';
 import { setSearchConfig, setWatchNext, isAndroidTvHomeSupported } from '../../modules/jellyfin-discovery/androidTv';
-import { landscapeUrl } from '../jellyfin/images';
-import { useContinueWatching } from '../jellyfin/library';
-import { useAuthedSession } from '../state/SessionContext';
+import { landscapeUrl } from '@tv-and-j/core/jellyfin/images';
+import { useContinueWatching } from '@tv-and-j/core/jellyfin/library';
+import { useAuthedSession } from '@tv-and-j/core/state/SessionContext';
 
 const TICKS_PER_MS = 10_000;
 

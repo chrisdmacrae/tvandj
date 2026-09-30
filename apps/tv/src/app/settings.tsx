@@ -15,11 +15,11 @@ import {
 } from '@tv-and-j/design-system';
 import type { SubtitlePlaybackMode } from '@jellyfin/sdk/lib/generated-client/models';
 import { PinSetup } from '../components/PinSetup';
-import { Downloadarr, findDownloadarr, normalizeBaseUrl } from '../downloadarr/client';
-import { isRestricted, ratingLimitLabel, useCurrentUser, useParentalRatings, useUpdateUserConfiguration } from '../jellyfin/users';
-import { hasPin } from '../state/profilePins';
-import { useAuthedSession } from '../state/SessionContext';
-import { useSettings, type Codec, type Language, type Quality, type Settings } from '../state/SettingsContext';
+import { Downloadarr, findDownloadarr, normalizeBaseUrl } from '@tv-and-j/core/downloadarr/client';
+import { isRestricted, ratingLimitLabel, useCurrentUser, useParentalRatings, useUpdateUserConfiguration } from '@tv-and-j/core/jellyfin/users';
+import { hasPin } from '@tv-and-j/core/state/profilePins';
+import { useAuthedSession } from '@tv-and-j/core/state/SessionContext';
+import { useSettings, type Codec, type Language, type Quality, type Settings } from '@tv-and-j/core/state/SettingsContext';
 
 const QUALITIES: { value: Quality; label: string }[] = [
   { value: '1080p', label: '1080p' },
@@ -269,7 +269,7 @@ export default function SettingsScreen() {
             </View>
           </Section>
 
-          <Section title="Playback">
+          <Section title="Playback" description="Synced with your Jellyfin account, so your other devices use them too (trailers are just for this TV).">
             <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm }}>
               <SelectChip
                 label="Skip intros and recaps automatically"
@@ -346,7 +346,7 @@ export default function SettingsScreen() {
               </Section>
 
               {settings.downloadarrUrl ? (
-                <Section title="Requests" description="What downloadarr looks for when you request something. Releases that don’t match are skipped.">
+                <Section title="Requests" description="What downloadarr looks for when you request something. Releases that don’t match are skipped. Synced with your Jellyfin account.">
                   <Text variant="label" tone="secondary">
                     Quality
                   </Text>

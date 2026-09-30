@@ -17,7 +17,7 @@ import {
   safeArea,
   spacing,
 } from '@tv-and-j/design-system';
-import type { DiscoverDetails, MediaKind } from '../../../downloadarr/client';
+import type { DiscoverDetails, MediaKind } from '@tv-and-j/core/downloadarr/client';
 import {
   requestKey,
   useDiscoverDetails,
@@ -27,14 +27,14 @@ import {
   useRequestSeasons,
   useRetryRequest,
   type MediaStatus,
-} from '../../../downloadarr/hooks';
+} from '@tv-and-j/core/downloadarr/hooks';
 import { DiscoverCard } from '../../../components/DiscoverCard';
 import { FittedText } from '../../../components/FittedText';
 import { TmdbPersonCard } from '../../../components/PersonCard';
 import { SeasonBrowser } from '../../../components/SeasonBrowser';
 import { YouTubeTrailer } from '../../../components/YouTubeTrailer';
-import { useJellyfinSeries } from '../../../jellyfin/library';
-import { TRAILER_IN_FLIGHT_KEY, useSettings, type Settings } from '../../../state/SettingsContext';
+import { useJellyfinSeries } from '@tv-and-j/core/jellyfin/library';
+import { TRAILER_IN_FLIGHT_KEY, useSettings, type Settings } from '@tv-and-j/core/state/SettingsContext';
 
 const QUALITY_LABEL = { '1080p': '1080p', '4k': '4K' } as const;
 const CODEC_LABEL = { h264: 'H.264', hevc: 'HEVC' } as const;

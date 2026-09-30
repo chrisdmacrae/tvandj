@@ -1,0 +1,41 @@
+{
+  "name": "@tv-and-j/pwa",
+  "version": "1.0.0",
+  "private": true,
+  "main": "expo-router/entry",
+  "scripts": {
+    "start": "expo start --web",
+    "build": "expo export --platform web",
+    "serve": "npx --yes serve dist --single",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@expo/metro-runtime": "~57.0.16",
+    "@jellyfin/sdk": "^1.0.0",
+    "@react-native-async-storage/async-storage": "2.2.0",
+    "@tanstack/react-query": "^5.104.0",
+    "@tv-and-j/core": "*",
+    "@tv-and-j/design-system": "*",
+    "expo": "~57.0.13",
+    "expo-constants": "~57.0.20",
+    "expo-device": "~57.0.2",
+    "expo-image": "~57.0.5",
+    "expo-linking": "~57.0.11",
+    "expo-router": "~57.0.24",
+    "expo-secure-store": "~57.0.4",
+    "expo-status-bar": "~57.0.1",
+    "hls.js": "^1.6.0",
+    "react": "19.2.3",
+    "react-dom": "19.2.3",
+    "react-native": "npm:react-native-tvos@0.86-stable",
+    "react-native-safe-area-context": "~5.7.0",
+    "react-native-screens": "~4.26.0",
+    "react-native-svg": "15.15.4",
+    "react-native-url-polyfill": "^4.0.0",
+    "react-native-web": "~0.21.0"
+  },
+  "devDependencies": {
+    "@types/react": "~19.2.2",
+    "typescript": "~6.0.3"
+  }
+}

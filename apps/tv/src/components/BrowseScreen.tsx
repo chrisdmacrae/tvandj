@@ -1,10 +1,10 @@
 import { router } from 'expo-router';
 import { ActivityIndicator, FlatList, View } from 'react-native';
 import { Button, Shelf, Text, colors, safeArea, spacing } from '@tv-and-j/design-system';
-import type { MediaKind } from '../downloadarr/client';
-import { useDiscoverGenre, useDiscoverGenres, useDownloadarr, usePopular, useRequestedItems } from '../downloadarr/hooks';
-import { useHasCollections } from '../jellyfin/browse';
-import { useLibraryByGenre, useLibraryGenres } from '../jellyfin/library';
+import type { MediaKind } from '@tv-and-j/core/downloadarr/client';
+import { useDiscoverGenre, useDiscoverGenres, useDownloadarr, usePopular, useRequestedItems } from '@tv-and-j/core/downloadarr/hooks';
+import { useHasCollections } from '@tv-and-j/core/jellyfin/browse';
+import { useLibraryByGenre, useLibraryGenres } from '@tv-and-j/core/jellyfin/library';
 import { DiscoverCard } from './DiscoverCard';
 import { MediaCard } from './MediaCard';
 import { RequestedRow } from './RequestedRow';

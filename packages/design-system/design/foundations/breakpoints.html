@@ -1,0 +1,15 @@
+<!-- @dsCard group="Layout" -->
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Breakpoints</title><link rel="stylesheet" href="../components.css"></head>
+<body><div class="preview">
+<p class="t-body tone-secondary" style="max-width:600px">One set of components across TV, phone, tablet and desktop. <b>useLayout()</b> picks the layout: a TV is always <b>tv</b>; anything else goes by width. The side gutter follows it.</p>
+<table class="t-caption" style="border-collapse:collapse;min-width:520px">
+<tr class="tone-secondary"><th align="left" style="padding:6px 16px 6px 0">Layout</th><th align="left" style="padding:6px 16px">Width</th><th align="left" style="padding:6px 16px">Gutter</th><th align="left" style="padding:6px 16px">Navigation</th></tr>
+<tr><td style="padding:6px 16px 6px 0"><b>tv</b></td><td style="padding:6px 16px">any (960×540dp canvas)</td><td style="padding:6px 16px">var(--gutter-tv)</td><td style="padding:6px 16px">TabBar, D-pad focus</td></tr>
+<tr><td style="padding:6px 16px 6px 0"><b>phone</b></td><td style="padding:6px 16px">&lt; var(--breakpoint-tablet)</td><td style="padding:6px 16px">var(--gutter-phone)</td><td style="padding:6px 16px">BottomNav, touch</td></tr>
+<tr><td style="padding:6px 16px 6px 0"><b>tablet</b></td><td style="padding:6px 16px">var(--breakpoint-tablet) – var(--breakpoint-desktop)</td><td style="padding:6px 16px">var(--gutter-tablet)</td><td style="padding:6px 16px">TabBar, touch</td></tr>
+<tr><td style="padding:6px 16px 6px 0"><b>desktop</b></td><td style="padding:6px 16px">≥ var(--breakpoint-desktop)</td><td style="padding:6px 16px">var(--gutter-desktop)</td><td style="padding:6px 16px">TabBar, hover and keyboard</td></tr>
+</table>
+<p class="t-caption tone-tertiary">Values: tablet 600px, desktop 1024px; gutters 48 / 40 / 24 / 16px.</p>
+</div></body></html>

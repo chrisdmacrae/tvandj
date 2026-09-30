@@ -3,10 +3,10 @@ import { View } from 'react-native';
 import { Button, Text, spacing } from '@tv-and-j/design-system';
 import { DeleteButton } from '../../components/DeleteButton';
 import { MusicCollection } from '../../components/MusicCollection';
-import { posterUrl } from '../../jellyfin/images';
-import { useItem } from '../../jellyfin/library';
-import { trackLength, useAlbumTracks } from '../../jellyfin/music';
-import { useAuthedSession } from '../../state/SessionContext';
+import { posterUrl } from '@tv-and-j/core/jellyfin/images';
+import { useItem } from '@tv-and-j/core/jellyfin/library';
+import { trackLength, useAlbumTracks } from '@tv-and-j/core/jellyfin/music';
+import { useAuthedSession } from '@tv-and-j/core/state/SessionContext';
 
 const goBack = () => (router.canGoBack() ? router.back() : router.replace('/'));
 

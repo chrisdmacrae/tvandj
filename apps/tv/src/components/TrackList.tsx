@@ -1,7 +1,7 @@
 import type { BaseItemDto } from '@jellyfin/sdk/lib/generated-client/models';
 import { View } from 'react-native';
 import { ListItem, spacing } from '@tv-and-j/design-system';
-import { trackLength } from '../jellyfin/music';
+import { trackLength } from '@tv-and-j/core/jellyfin/music';
 import { useMusic } from '../music/MusicPlayer';
 
 type TrackListProps = {

@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 import { View } from 'react-native';
+import { useLayout } from '../layout';
 import { colors, radii, safeArea, spacing } from '../tokens';
 import { Focusable } from './Focusable';
 import { Text } from './Text';
@@ -16,14 +17,16 @@ export type TabBarProps = {
 
 /** Top-level navigation. The selected tab is underlined; the focused one inverts like a button. */
 export function TabBar({ tabs, selected, onSelect, trailing }: TabBarProps) {
+  const { gutter, breakpoint } = useLayout();
   return (
     <View
       accessibilityRole="tablist"
       style={{
         flexDirection: 'row',
         alignItems: 'center',
-        paddingHorizontal: safeArea.horizontal,
-        paddingTop: safeArea.vertical,
+        paddingHorizontal: gutter,
+        // TVs need overscan room at the top; other screens don't.
+        paddingTop: breakpoint === 'tv' ? safeArea.vertical : spacing.md,
         paddingBottom: spacing.md,
         gap: spacing.xs,
       }}

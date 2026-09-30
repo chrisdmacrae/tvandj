@@ -1,0 +1,21 @@
+{
+  "name": "@tv-and-j/core",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Everything TV and J's apps share that isn't UI: Jellyfin and downloadarr data, sign-in, profiles and settings. Import by path, e.g. @tv-and-j/core/jellyfin/library.",
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@jellyfin/sdk": "^1.0.0"
+  },
+  "peerDependencies": {
+    "@react-native-async-storage/async-storage": "*",
+    "@tanstack/react-query": "*",
+    "expo-constants": "*",
+    "expo-device": "*",
+    "expo-secure-store": "*",
+    "react": "*",
+    "react-native": "*"
+  }
+}

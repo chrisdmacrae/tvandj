@@ -27,7 +27,10 @@ export function Focusable({
   onBlur,
   ...rest
 }: FocusableProps) {
-  const [focused, setFocused] = useState(false);
+  // Keyboard/D-pad focus, or a mouse over it (web): both show the focused look.
+  const [hasFocus, setHasFocus] = useState(false);
+  const [hovered, setHovered] = useState(false);
+  const focused = hasFocus || hovered;
   const scale = useRef(new Animated.Value(1)).current;
 
   const animateTo = (toValue: number) =>
@@ -37,14 +40,23 @@ export function Focusable({
     <Pressable
       {...rest}
       onFocus={(e) => {
-        setFocused(true);
+        setHasFocus(true);
         animateTo(focusScale);
         onFocus?.(e);
       }}
       onBlur={(e) => {
-        setFocused(false);
-        animateTo(1);
+        setHasFocus(false);
+        if (!hovered) animateTo(1);
         onBlur?.(e);
+      }}
+      // Pointer hover (web; never fires on TV or touch screens).
+      onHoverIn={() => {
+        setHovered(true);
+        animateTo(focusScale);
+      }}
+      onHoverOut={() => {
+        setHovered(false);
+        if (!hasFocus) animateTo(1);
       }}
     >
       <Animated.View

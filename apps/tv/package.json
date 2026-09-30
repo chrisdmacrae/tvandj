@@ -16,6 +16,7 @@
     "@jellyfin/sdk": "^1.0.0",
     "@react-native-async-storage/async-storage": "2.2.0",
     "@tanstack/react-query": "^5.104.0",
+    "@tv-and-j/core": "*",
     "@tv-and-j/design-system": "*",
     "axios": "^1.20.0",
     "expo": "~57.0.13",

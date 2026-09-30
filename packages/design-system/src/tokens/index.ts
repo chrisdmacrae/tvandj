@@ -62,6 +62,23 @@ export const safeArea = {
   vertical: 27,
 } as const;
 
+/**
+ * Screen widths (dp / CSS px) where the web and mobile layouts change. TVs
+ * don't use these: a TV is always the 'tv' layout, whatever its width.
+ */
+export const breakpoints = {
+  tablet: 600,
+  desktop: 1024,
+} as const;
+
+/** Side margin per layout: TV overscan, then tighter on smaller screens. */
+export const gutters = {
+  tv: safeArea.horizontal,
+  desktop: 40,
+  tablet: 24,
+  phone: 16,
+} as const;
+
 export const radii = {
   none: 0,
   sm: 4,
@@ -111,6 +128,8 @@ export const tokens = {
   colors,
   spacing,
   safeArea,
+  breakpoints,
+  gutters,
   radii,
   fontFamily,
   typography,

@@ -5,7 +5,7 @@
  * Routes have no prefix on the API port (3001); behind its web UI they
  * live under /api.
  */
-import { discoverDownloadarr } from '../../modules/jellyfin-discovery';
+import { discoverDownloadarr } from '../platform';
 import type { Codec, Language, Quality, Settings } from '../state/SettingsContext';
 
 export type MediaKind = 'movie' | 'tv';

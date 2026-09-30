@@ -1,11 +1,11 @@
 import { router } from 'expo-router';
 import { memo } from 'react';
 import { PosterCard } from '@tv-and-j/design-system';
-import type { DiscoverItem, MediaKind } from '../downloadarr/client';
-import { useActiveDownload, useMediaStatus, type MediaStatus } from '../downloadarr/hooks';
+import type { DiscoverItem, MediaKind } from '@tv-and-j/core/downloadarr/client';
+import { useActiveDownload, useMediaStatus, type MediaStatus } from '@tv-and-j/core/downloadarr/hooks';
 import { imageGlow } from '../lib/glowColor';
 import { useSetGlow } from '../state/GlowContext';
-import { useAuthedSession } from '../state/SessionContext';
+import { useAuthedSession } from '@tv-and-j/core/state/SessionContext';
 
 /** Card props for a title's download state; shared with Jellyfin cards and the summary page. */
 export function downloadDisplay(status: MediaStatus): { download?: number | null; status?: string } {

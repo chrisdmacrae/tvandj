@@ -4,9 +4,9 @@ import { ActivityIndicator, ScrollView, View } from 'react-native';
 import { ArrowLeftIcon, IconButton, SelectChip, Shelf, Text, TextField, colors, safeArea, spacing } from '@tv-and-j/design-system';
 import { DiscoverCard } from '../components/DiscoverCard';
 import { MediaCard } from '../components/MediaCard';
-import type { MediaKind } from '../downloadarr/client';
-import { requestKey, useDiscoverSearch, useDownloadarr } from '../downloadarr/hooks';
-import { useLibraryIndex, useLibrarySearch } from '../jellyfin/library';
+import type { MediaKind } from '@tv-and-j/core/downloadarr/client';
+import { requestKey, useDiscoverSearch, useDownloadarr } from '@tv-and-j/core/downloadarr/hooks';
+import { useLibraryIndex, useLibrarySearch } from '@tv-and-j/core/jellyfin/library';
 
 const DEBOUNCE_MS = 400;
 

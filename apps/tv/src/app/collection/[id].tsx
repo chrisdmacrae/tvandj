@@ -3,8 +3,8 @@ import { Text } from '@tv-and-j/design-system';
 import { ItemGrid } from '../../components/ItemGrid';
 import { GlowScreen } from '../../components/GlowScreen';
 import { PageHeader } from '../../components/PageHeader';
-import { useItemGrid } from '../../jellyfin/browse';
-import { useItem } from '../../jellyfin/library';
+import { useItemGrid } from '@tv-and-j/core/jellyfin/browse';
+import { useItem } from '@tv-and-j/core/jellyfin/library';
 
 /** A collection (box set, e.g. a film series): its titles in release order. */
 export default function Collection() {

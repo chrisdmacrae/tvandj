@@ -3,8 +3,8 @@ import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, View } from 'react-native';
 import { Button, Text, colors, spacing } from '@tv-and-j/design-system';
 import { WizardStep } from '../../components/WizardStep';
-import { ServerConnectionError, connectToServer, type ServerInfo } from '../../jellyfin/servers';
-import { useSession } from '../../state/SessionContext';
+import { ServerConnectionError, connectToServer, type ServerInfo } from '@tv-and-j/core/jellyfin/servers';
+import { useSession } from '@tv-and-j/core/state/SessionContext';
 
 type State =
   | { status: 'connecting' }

@@ -6,11 +6,11 @@ import { GlowScreen } from '../../components/GlowScreen';
 import { CardGrid } from '../../components/ItemGrid';
 import { MediaCard } from '../../components/MediaCard';
 import { PageHeader } from '../../components/PageHeader';
-import { posterUrl } from '../../jellyfin/images';
-import { useItem } from '../../jellyfin/library';
-import { fetchArtistSongs, fetchInstantMix, useArtistAlbums } from '../../jellyfin/music';
+import { posterUrl } from '@tv-and-j/core/jellyfin/images';
+import { useItem } from '@tv-and-j/core/jellyfin/library';
+import { fetchArtistSongs, fetchInstantMix, useArtistAlbums } from '@tv-and-j/core/jellyfin/music';
 import { useMusic } from '../../music/MusicPlayer';
-import { useAuthedSession } from '../../state/SessionContext';
+import { useAuthedSession } from '@tv-and-j/core/state/SessionContext';
 
 const PHOTO = 112;
 

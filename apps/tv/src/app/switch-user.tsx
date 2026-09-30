@@ -2,10 +2,10 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { View } from 'react-native';
 import { ArrowLeftIcon, Avatar, Button, IconButton, Text, TextField, colors, radii, safeArea, spacing } from '@tv-and-j/design-system';
-import { SignInError, pollQuickConnect, signInWithPassword, startQuickConnect, type QuickConnectSession } from '../jellyfin/auth';
+import { SignInError, pollQuickConnect, signInWithPassword, startQuickConnect, type QuickConnectSession } from '@tv-and-j/core/jellyfin/auth';
 import { goHome } from '../lib/navigation';
-import { setPin } from '../state/profilePins';
-import { useAuthedSession } from '../state/SessionContext';
+import { setPin } from '@tv-and-j/core/state/profilePins';
+import { useAuthedSession } from '@tv-and-j/core/state/SessionContext';
 
 const POLL_MS = 3000;
 const goBack = () => (router.canGoBack() ? router.back() : router.replace('/'));

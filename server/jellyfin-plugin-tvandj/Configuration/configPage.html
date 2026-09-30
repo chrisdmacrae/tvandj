@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>TV and J</title>
+</head>
+<body>
+    <div id="TvAndJConfigPage" data-role="page" class="page type-interior pluginConfigurationPage" data-require="emby-button">
+        <div data-role="content">
+            <div class="content-primary">
+                <h2 class="sectionTitle">TV and J</h2>
+                <p>Household settings shared by the TV and J apps on every device and for every user. Change them from the apps' Settings as an administrator.</p>
+                <pre id="TvAndJSettings" style="white-space:pre-wrap;padding:1em;background:rgba(0,0,0,.2);border-radius:4px"></pre>
+                <p id="TvAndJUpdated" class="fieldDescription"></p>
+            </div>
+        </div>
+        <script type="text/javascript">
+            (function () {
+                var pluginId = '7a1c6f2e-3b4d-4e8a-9f10-5c2d7e8b9a01';
+                document.querySelector('#TvAndJConfigPage').addEventListener('pageshow', function () {
+                    ApiClient.getPluginConfiguration(pluginId).then(function (config) {
+                        var text;
+                        try { text = JSON.stringify(JSON.parse(config.SettingsJson || '{}'), null, 2); } catch (e) { text = config.SettingsJson; }
+                        document.querySelector('#TvAndJSettings').textContent = text;
+                        document.querySelector('#TvAndJUpdated').textContent = config.UpdatedAt
+                            ? 'Last changed ' + new Date(config.UpdatedAt).toLocaleString()
+                            : 'Not set yet.';
+                    });
+                });
+            })();
+        </script>
+    </div>
+</body>
+</html>

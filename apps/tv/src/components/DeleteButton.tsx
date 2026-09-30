@@ -4,7 +4,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { Modal, View } from 'react-native';
 import { Button, IconButton, Text, TrashIcon, colors, radii, spacing } from '@tv-and-j/design-system';
-import { useAuthedSession } from '../state/SessionContext';
+import { useAuthedSession } from '@tv-and-j/core/state/SessionContext';
 
 const WHAT: Record<string, string> = {
   Movie: 'this movie',

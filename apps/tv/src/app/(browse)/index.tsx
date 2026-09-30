@@ -5,10 +5,10 @@ import { Shelf, Text, colors, safeArea, spacing, type ArtworkShape } from '@tv-a
 import { DiscoverCard } from '../../components/DiscoverCard';
 import { MediaCard } from '../../components/MediaCard';
 import { RequestedRow } from '../../components/RequestedRow';
-import type { DiscoverItem, MediaKind } from '../../downloadarr/client';
-import { useDownloadarr, usePopular, requestKey, useRequestedItems } from '../../downloadarr/hooks';
-import { useMyList } from '../../jellyfin/browse';
-import { useContinueWatching, useLatest, useLibraryIndex, useLibraryKinds } from '../../jellyfin/library';
+import type { DiscoverItem, MediaKind } from '@tv-and-j/core/downloadarr/client';
+import { useDownloadarr, usePopular, requestKey, useRequestedItems } from '@tv-and-j/core/downloadarr/hooks';
+import { useMyList } from '@tv-and-j/core/jellyfin/browse';
+import { useContinueWatching, useLatest, useLibraryIndex, useLibraryKinds } from '@tv-and-j/core/jellyfin/library';
 
 type Row =
   | { key: string; title: string; kind: 'library'; shape: ArtworkShape; items: BaseItemDto[] }

@@ -2,14 +2,14 @@ import type { BaseItemDto } from '@jellyfin/sdk/lib/generated-client/models';
 import { useEffect, useMemo, useState } from 'react';
 import { FlatList, TVFocusGuideView, View } from 'react-native';
 import { Button, Dropdown, PosterCard, Text, safeArea, spacing } from '@tv-and-j/design-system';
-import type { RequestSeason } from '../downloadarr/client';
-import { useRequestSeasons } from '../downloadarr/hooks';
-import { seasonProgress, type TvProgress } from '../downloadarr/tvStatus';
-import { landscapeUrl } from '../jellyfin/images';
-import { useTogglePlayed } from '../jellyfin/browse';
+import type { RequestSeason } from '@tv-and-j/core/downloadarr/client';
+import { useRequestSeasons } from '@tv-and-j/core/downloadarr/hooks';
+import { seasonProgress, type TvProgress } from '@tv-and-j/core/downloadarr/tvStatus';
+import { landscapeUrl } from '@tv-and-j/core/jellyfin/images';
+import { useTogglePlayed } from '@tv-and-j/core/jellyfin/browse';
 import { DeleteButton } from './DeleteButton';
-import { useEpisodes, useSeasons } from '../jellyfin/library';
-import { useAuthedSession } from '../state/SessionContext';
+import { useEpisodes, useSeasons } from '@tv-and-j/core/jellyfin/library';
+import { useAuthedSession } from '@tv-and-j/core/state/SessionContext';
 
 // react-native-web has no focus guides; a plain View is fine there.
 const FocusGuide = TVFocusGuideView ?? View;

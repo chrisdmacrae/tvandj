@@ -1,4 +1,6 @@
 import 'react-native-url-polyfill/auto';
+// Before anything plays: tell the shared code what this TV can decode.
+import '../platform';
 
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { DarkTheme, Stack, ThemeProvider } from 'expo-router';
@@ -11,8 +13,8 @@ import { AndroidTvHome } from '../components/AndroidTvHome';
 import { Screensaver } from '../components/Screensaver';
 import { MusicPlayerProvider } from '../music/MusicPlayer';
 import { RemoteControl } from '../remote/RemoteControl';
-import { SessionProvider, useSession } from '../state/SessionContext';
-import { SettingsProvider } from '../state/SettingsContext';
+import { SessionProvider, useSession } from '@tv-and-j/core/state/SessionContext';
+import { SettingsProvider } from '@tv-and-j/core/state/SettingsContext';
 
 // Dark navigation chrome so nothing flashes the default light theme.
 const theme = {

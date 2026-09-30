@@ -4,7 +4,7 @@ import { IconButton, SearchIcon, SettingsIcon, TabBar, colors, spacing } from '@
 import { FocusGlow } from '../../components/GlowScreen';
 import { NowPlayingButton } from '../../components/NowPlayingButton';
 import { UserSwitcher } from '../../components/UserSwitcher';
-import { useLibraryKinds } from '../../jellyfin/library';
+import { useLibraryKinds } from '@tv-and-j/core/jellyfin/library';
 import { GlowProvider } from '../../state/GlowContext';
 
 const TABS = [

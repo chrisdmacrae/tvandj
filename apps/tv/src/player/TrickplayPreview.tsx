@@ -1,7 +1,7 @@
 import { Image } from 'expo-image';
 import { View } from 'react-native';
-import type { Trickplay } from '../jellyfin/playback';
-import { useAuthedSession } from '../state/SessionContext';
+import type { Trickplay } from '@tv-and-j/core/jellyfin/playback';
+import { useAuthedSession } from '@tv-and-j/core/state/SessionContext';
 
 /** Shown width of the scrub thumbnail. */
 const DISPLAY_WIDTH = 240;

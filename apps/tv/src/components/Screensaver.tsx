@@ -7,10 +7,10 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { Animated, Modal, Platform, Pressable, View } from 'react-native';
 import Svg, { Defs, LinearGradient, Rect, Stop } from 'react-native-svg';
 import { Text, colors, safeArea, spacing } from '@tv-and-j/design-system';
-import { backdropUrl, logoUrl } from '../jellyfin/images';
+import { backdropUrl, logoUrl } from '@tv-and-j/core/jellyfin/images';
 import { useRemoteKeys } from '../player/useRemoteKeys';
-import { useAuthedSession } from '../state/SessionContext';
-import { useSettings } from '../state/SettingsContext';
+import { useAuthedSession } from '@tv-and-j/core/state/SessionContext';
+import { useSettings } from '@tv-and-j/core/state/SettingsContext';
 
 const SLIDE_MS = 15_000;
 const CROSSFADE_MS = 2_000;

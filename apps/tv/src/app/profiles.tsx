@@ -4,11 +4,11 @@ import { useEffect, useState } from 'react';
 import { ActivityIndicator, ScrollView, View } from 'react-native';
 import { ArrowLeftIcon, Avatar, AvatarButton, Button, IconButton, PinPad, Text, colors, safeArea, spacing } from '@tv-and-j/design-system';
 import { WizardStep } from '../components/WizardStep';
-import { SignInError, signInWithPassword } from '../jellyfin/auth';
-import { ratingLimitLabel, useParentalRatings, userAvatarUrl, useServerUsers } from '../jellyfin/users';
+import { SignInError, signInWithPassword } from '@tv-and-j/core/jellyfin/auth';
+import { ratingLimitLabel, useParentalRatings, userAvatarUrl, useServerUsers } from '@tv-and-j/core/jellyfin/users';
 import { goHome } from '../lib/navigation';
-import { PIN_LENGTH, checkPin, lockedProfiles } from '../state/profilePins';
-import { useAuthedSession } from '../state/SessionContext';
+import { PIN_LENGTH, checkPin, lockedProfiles } from '@tv-and-j/core/state/profilePins';
+import { useAuthedSession } from '@tv-and-j/core/state/SessionContext';
 
 type Person = Pick<UserDto, 'Id' | 'Name' | 'PrimaryImageTag' | 'HasPassword' | 'Policy'> & { Id: string; Name: string };
 

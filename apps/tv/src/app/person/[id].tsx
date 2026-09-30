@@ -4,9 +4,9 @@ import { Avatar, Text, spacing } from '@tv-and-j/design-system';
 import { ItemGrid } from '../../components/ItemGrid';
 import { GlowScreen } from '../../components/GlowScreen';
 import { PageHeader } from '../../components/PageHeader';
-import { useItemGrid, usePerson } from '../../jellyfin/browse';
-import { personImageUrl } from '../../jellyfin/images';
-import { useAuthedSession } from '../../state/SessionContext';
+import { useItemGrid, usePerson } from '@tv-and-j/core/jellyfin/browse';
+import { personImageUrl } from '@tv-and-j/core/jellyfin/images';
+import { useAuthedSession } from '@tv-and-j/core/state/SessionContext';
 
 const PHOTO = 112;
 

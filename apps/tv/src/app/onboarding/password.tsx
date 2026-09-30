@@ -3,8 +3,8 @@ import { useRef, useState } from 'react';
 import type { TextInput } from 'react-native';
 import { Button, TextField } from '@tv-and-j/design-system';
 import { WizardStep } from '../../components/WizardStep';
-import { SignInError, signInWithPassword } from '../../jellyfin/auth';
-import { useSession } from '../../state/SessionContext';
+import { SignInError, signInWithPassword } from '@tv-and-j/core/jellyfin/auth';
+import { useSession } from '@tv-and-j/core/state/SessionContext';
 
 export default function PasswordSignIn() {
   const { jellyfin, server, signIn } = useSession();

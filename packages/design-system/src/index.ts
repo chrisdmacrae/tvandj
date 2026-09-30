@@ -1,4 +1,5 @@
 export * from './tokens';
+export * from './layout';
 export * from './components/Text';
 export * from './components/Focusable';
 export * from './components/Button';
@@ -20,3 +21,4 @@ export * from './components/Dropdown';
 export * from './components/AmbientGlow';
 export * from './components/Avatar';
 export * from './components/PinPad';
+export * from './components/BottomNav';

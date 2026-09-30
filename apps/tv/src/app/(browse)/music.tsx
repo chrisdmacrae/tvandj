@@ -2,7 +2,7 @@ import { router } from 'expo-router';
 import { ActivityIndicator, ScrollView, View } from 'react-native';
 import { Button, Shelf, Text, colors, safeArea, spacing } from '@tv-and-j/design-system';
 import { MediaCard } from '../../components/MediaCard';
-import { useAlbumArtists, useMusicPlaylists, useRecentAlbums, useRecentlyPlayedAlbums } from '../../jellyfin/music';
+import { useAlbumArtists, useMusicPlaylists, useRecentAlbums, useRecentlyPlayedAlbums } from '@tv-and-j/core/jellyfin/music';
 
 const ARTISTS_ROW = 24;
 

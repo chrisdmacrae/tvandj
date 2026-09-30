@@ -1,0 +1,32 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "pwa",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": [
+        "run",
+        "start",
+        "-w",
+        "@tv-and-j/pwa",
+        "--",
+        "--port",
+        "8082"
+      ],
+      "port": 8082
+    },
+    {
+      "name": "pwa-dist",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": [
+        "--yes",
+        "serve",
+        "apps/pwa/dist",
+        "--single",
+        "-l",
+        "8083"
+      ],
+      "port": 8083
+    }
+  ]
+}

@@ -34,6 +34,12 @@
   --radius-md: 8px;
   --radius-lg: 12px;
   --radius-pill: 999px;
+  --breakpoint-tablet: 600px;
+  --breakpoint-desktop: 1024px;
+  --gutter-tv: 48px;
+  --gutter-desktop: 40px;
+  --gutter-tablet: 24px;
+  --gutter-phone: 16px;
   --type-display-size: 40px;
   --type-display-line: 48px;
   --type-display-weight: 700;

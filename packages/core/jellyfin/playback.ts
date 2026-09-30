@@ -8,7 +8,7 @@ import type {
   TrickplayInfoDto,
 } from '@jellyfin/sdk/lib/generated-client/models';
 import { getLibraryApi, getMediaInfoApi, getSessionApi } from '@jellyfin/sdk/lib/utils/api';
-import { audioCodecs, videoDecoders } from '../../modules/jellyfin-discovery/capabilities';
+import { audioCodecs, directPlayContainers, videoDecoders } from '../platform';
 
 export const TICKS_PER_SECOND = 10_000_000;
 
@@ -66,7 +66,7 @@ function deviceProfile(): DeviceProfile {
     MaxStaticBitrate: 120_000_000,
     MusicStreamingTranscodingBitrate: 320_000,
     DirectPlayProfiles: [
-      { Type: 'Video', Container: 'mp4,m4v,mkv,webm', VideoCodec: videoCodecs, AudioCodec: audioCodecs().join(',') },
+      { Type: 'Video', Container: directPlayContainers().join(','), VideoCodec: videoCodecs, AudioCodec: audioCodecs().join(',') },
       { Type: 'Audio', Container: 'mp3,aac,m4a,flac,ogg,opus,wav' },
     ],
     TranscodingProfiles: [

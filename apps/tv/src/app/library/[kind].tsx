@@ -6,9 +6,9 @@ import { Dropdown, SelectChip, spacing } from '@tv-and-j/design-system';
 import { ItemGrid } from '../../components/ItemGrid';
 import { GlowScreen } from '../../components/GlowScreen';
 import { PageHeader } from '../../components/PageHeader';
-import { GRID_SORTS, useItemGrid, type GridSort } from '../../jellyfin/browse';
-import { useLibraryGenres } from '../../jellyfin/library';
-import { useAlbumArtists } from '../../jellyfin/music';
+import { GRID_SORTS, useItemGrid, type GridSort } from '@tv-and-j/core/jellyfin/browse';
+import { useLibraryGenres } from '@tv-and-j/core/jellyfin/library';
+import { useAlbumArtists } from '@tv-and-j/core/jellyfin/music';
 
 type Kind = 'movies' | 'tv' | 'collections' | 'mylist' | 'albums' | 'artists';
 

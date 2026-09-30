@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react';
-import type { Segment } from '../jellyfin/segments';
+import type { Segment } from '@tv-and-j/core/jellyfin/segments';
 import type { Playback } from './usePlayback';
 
 const LABELS: Record<string, string> = {

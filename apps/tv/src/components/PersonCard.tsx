@@ -3,9 +3,9 @@ import { router } from 'expo-router';
 import { memo } from 'react';
 import { View } from 'react-native';
 import { AvatarButton, Text, artwork, spacing } from '@tv-and-j/design-system';
-import type { CreditPerson } from '../downloadarr/client';
-import { personImageUrl } from '../jellyfin/images';
-import { useAuthedSession } from '../state/SessionContext';
+import type { CreditPerson } from '@tv-and-j/core/downloadarr/client';
+import { personImageUrl } from '@tv-and-j/core/jellyfin/images';
+import { useAuthedSession } from '@tv-and-j/core/state/SessionContext';
 
 const AVATAR = 88;
 

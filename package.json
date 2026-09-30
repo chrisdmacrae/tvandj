@@ -10,6 +10,14 @@
     "android:tv": "npm run android -w @tv-and-j/tv",
     "prebuild:tv": "npm run prebuild:tv -w @tv-and-j/tv",
     "typecheck": "npm run typecheck --workspaces --if-present",
-    "design:preview": "npx --yes serve packages/design-system/design"
+    "design:preview": "npx --yes serve packages/design-system/design",
+    "pwa": "npm run start -w @tv-and-j/pwa",
+    "build:pwa": "npm run build -w @tv-and-j/pwa"
+  },
+  "version": "1.0.0",
+  "dependencies": {
+    "expo": "~57.0.26",
+    "react": "19.2.3",
+    "react-native": "npm:react-native-tvos@0.86-stable"
   }
 }

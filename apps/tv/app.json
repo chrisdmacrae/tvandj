@@ -4,7 +4,7 @@
       [
         "@react-native-tvos/config-tv",
         {
-          "androidTVBanner": "./assets/images/icon-400x240.png",
+          "androidTVBanner": "./assets/images/tile-1280x720.png",
           "appleTVImages": {
             "icon": "./assets/images/icon-1280x768.png",
             "iconSmall": "./assets/images/icon-400x240.png",
@@ -36,14 +36,21 @@
       ],
       "expo-video",
       "expo-secure-store",
-      "expo-image"
+      "expo-image",
+      [
+        "./plugins/withFireTvIcon",
+        {
+          "icon": "./assets/images/square-icon-1024.png"
+        }
+      ]
     ],
     "android": {
       "package": "dev.chrisdmacrae.tvandj",
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/adaptive-icon.png",
         "backgroundColor": "#0B0D12"
-      }
+      },
+      "versionCode": 5
     },
     "ios": {
       "bundleIdentifier": "dev.chrisdmacrae.tvandj"
@@ -52,6 +59,7 @@
     "slug": "tv-and-j",
     "icon": "./assets/images/icon.png",
     "userInterfaceStyle": "dark",
-    "scheme": "tvandj"
+    "scheme": "tvandj",
+    "version": "1.0.4"
   }
 }

@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Modal, View } from 'react-native';
 import { Button, PinPad, Text, colors, radii, spacing } from '@tv-and-j/design-system';
-import { PIN_LENGTH, checkPin, setPin } from '../state/profilePins';
+import { PIN_LENGTH, checkPin, setPin } from '@tv-and-j/core/state/profilePins';
 
 type Step = 'current' | 'new' | 'confirm';
 
