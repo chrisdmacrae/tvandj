@@ -49,7 +49,13 @@ export default function Album() {
         </View>
         <View style={{ gap: spacing.xs }}>
           {tracks.map((track, i) => (
-            <ListItem key={track.Id} title={`${track.IndexNumber ?? i + 1}. ${track.Name ?? ''}`} trailing={trackLength(track.RunTimeTicks)} onPress={() => play(i)} />
+            // Scrobble sits beside the row, not in it: the row itself is a button (it plays).
+            <View key={track.Id} style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs }}>
+              <View style={{ flex: 1 }}>
+                <ListItem title={`${track.IndexNumber ?? i + 1}. ${track.Name ?? ''}`} trailing={trackLength(track.RunTimeTicks)} onPress={() => play(i)} />
+              </View>
+              <ScrobbleButton itemId={track.Id} itemType={track.Type} compact />
+            </View>
           ))}
         </View>
       </View>

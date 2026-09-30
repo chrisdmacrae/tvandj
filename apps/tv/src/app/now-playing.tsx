@@ -23,6 +23,7 @@ import {
 } from '@tv-and-j/design-system';
 import { posterUrl } from '@tv-and-j/core/jellyfin/images';
 import { trackLength, useLyrics, type LyricLine } from '@tv-and-j/core/jellyfin/music';
+import { ScrobbleButton } from '../components/ScrobbleButton';
 import { useMusic, useMusicProgress } from '../music/MusicPlayer';
 import { formatTime } from '@tv-and-j/player/PlayerControls';
 import { useRemoteKeys } from '@tv-and-j/player/useRemoteKeys';
@@ -92,6 +93,8 @@ export default function NowPlaying() {
               {current.AlbumId ? (
                 <Button label={current.Album ?? 'Album'} size="sm" variant="ghost" onPress={() => router.push({ pathname: '/album/[id]', params: { id: current.AlbumId! } })} />
               ) : null}
+              {/* Keyed by song, so "✓ Scrobbled" doesn't carry over to the next one. */}
+              <ScrobbleButton key={current.Id} itemId={current.Id} itemType={current.Type} />
             </View>
           </View>
 
