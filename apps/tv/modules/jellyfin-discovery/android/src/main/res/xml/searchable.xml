@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Android TV system search: results come from SearchProvider and open tvandj://item/<id>. -->
+<searchable xmlns:android="http://schemas.android.com/apk/res/android"
+  android:label="@string/tvandj_search_label"
+  android:hint="@string/tvandj_search_hint"
+  android:searchSettingsDescription="@string/tvandj_search_description"
+  android:searchSuggestAuthority="dev.chrisdmacrae.tvandj.search"
+  android:searchSuggestIntentAction="android.intent.action.VIEW"
+  android:searchSuggestIntentData="tvandj://item"
+  android:searchSuggestSelection=" ?"
+  android:searchSuggestThreshold="1"
+  android:includeInGlobalSearch="true" />

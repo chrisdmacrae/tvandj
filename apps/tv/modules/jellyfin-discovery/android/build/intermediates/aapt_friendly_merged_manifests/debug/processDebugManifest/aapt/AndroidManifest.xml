@@ -5,5 +5,32 @@
     <uses-sdk android:minSdkVersion="24" />
     <!-- Some Wi-Fi drivers drop broadcast replies unless a multicast lock is held. -->
     <uses-permission android:name="android.permission.CHANGE_WIFI_MULTICAST_STATE" />
+    <!-- Watch Next row on the Android TV home screen. -->
+    <uses-permission android:name="com.android.providers.tv.permission.WRITE_EPG_DATA" />
+
+    <application>
+
+        <!-- Android TV system search: SearchActivity receives the search and result intents. -->
+        <activity
+            android:name="dev.chrisdmacrae.tvandj.discovery.SearchActivity"
+            android:excludeFromRecents="true"
+            android:exported="true"
+            android:theme="@android:style/Theme.Translucent.NoTitleBar" >
+            <intent-filter>
+                <action android:name="android.intent.action.SEARCH" />
+            </intent-filter>
+
+            <meta-data
+                android:name="android.app.searchable"
+                android:resource="@xml/searchable" />
+        </activity>
+
+        <!-- Only the system's search (which holds GLOBAL_SEARCH) may query it. -->
+        <provider
+            android:name="dev.chrisdmacrae.tvandj.discovery.SearchProvider"
+            android:authorities="dev.chrisdmacrae.tvandj.search"
+            android:exported="true"
+            android:permission="android.permission.GLOBAL_SEARCH" />
+    </application>
 
 </manifest>

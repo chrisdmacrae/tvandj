@@ -13,3 +13,8 @@ android {
     versionName "0.1.0"
   }
 }
+
+dependencies {
+  // Watch Next ("Continue watching") on the Android TV home screen.
+  implementation "androidx.tvprovider:tvprovider:1.1.0"
+}

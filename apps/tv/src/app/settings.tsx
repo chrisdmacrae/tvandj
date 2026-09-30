@@ -62,6 +62,15 @@ const SUBTITLE_MODES: { value: SubtitlePlaybackMode; label: string }[] = [
   { value: 'None', label: 'Never' },
 ];
 
+const SCREENSAVER_DELAYS = [
+  { value: 0, label: 'Off' },
+  // For checking the screensaver without waiting.
+  { value: 0.5, label: 'After 30 seconds' },
+  { value: 3, label: 'After 3 minutes' },
+  { value: 5, label: 'After 5 minutes' },
+  { value: 10, label: 'After 10 minutes' },
+];
+
 function Section({ title, description, children }: { title: string; description?: string; children: ReactNode }) {
   return (
     <View style={{ gap: spacing.md, marginBottom: spacing.xxl }}>
@@ -247,6 +256,19 @@ export default function SettingsScreen() {
             ) : null}
           </Section>
 
+          <Section title="Screensaver" description="Library backdrops and the time, after a while with nothing pressed on the browse screens. Any button comes back.">
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm }}>
+              {SCREENSAVER_DELAYS.map((d) => (
+                <SelectChip
+                  key={d.value}
+                  label={d.label}
+                  selected={settings.screensaverMinutes === d.value}
+                  onPress={() => update({ screensaverMinutes: d.value })}
+                />
+              ))}
+            </View>
+          </Section>
+
           <Section title="Playback">
             <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm }}>
               <SelectChip
@@ -258,6 +280,11 @@ export default function SettingsScreen() {
                 label="Play the next episode automatically"
                 selected={settings.playback.autoplayNext}
                 onPress={() => update({ playback: { ...settings.playback, autoplayNext: !settings.playback.autoplayNext } })}
+              />
+              <SelectChip
+                label="Play theme music on show pages"
+                selected={settings.playback.themeMusic}
+                onPress={() => update({ playback: { ...settings.playback, themeMusic: !settings.playback.themeMusic } })}
               />
               {settings.downloadarrUrl && !restricted ? (
                 <SelectChip

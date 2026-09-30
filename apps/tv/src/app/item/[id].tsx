@@ -23,6 +23,8 @@ import { useScrubber } from '../../player/useScrubber';
 import { useRemoteKeys } from '../../player/useRemoteKeys';
 import { UpNextCard } from '../../player/UpNextCard';
 import { useSegmentSkip } from '../../player/useSegmentSkip';
+import { useRemoteHandlers } from '../../remote/RemoteControl';
+import { useThemeMusic, useThemeSongUrl } from '../../player/useThemeMusic';
 import { useAuthedSession } from '../../state/SessionContext';
 import { useSettings } from '../../state/SettingsContext';
 
@@ -56,7 +58,8 @@ function episodeLine(item: BaseItemDto) {
 
 export default function ItemScreen() {
   // autoplay: arriving from Play on a just-downloaded title, so skip straight to the player.
-  const { id, autoplay } = useLocalSearchParams<{ id: string; autoplay?: string }>();
+  // start: begin here (seconds) rather than the resume point, e.g. "play from" on a phone.
+  const { id, autoplay, start: startParam } = useLocalSearchParams<{ id: string; autoplay?: string; start?: string }>();
   const { api } = useAuthedSession();
   const { width, height: screenHeight } = useWindowDimensions();
   const item = useItem(id).data;
@@ -67,7 +70,12 @@ export default function ItemScreen() {
   const { settings } = useSettings();
   // Assigned below, once the next episode is known; the player calls it when the last item ends.
   const onEnd = useRef<() => void>(() => {});
-  const playback = usePlayback(queue, { onEnd: () => onEnd.current(), active: useIsFocused() });
+  const focused = useIsFocused();
+  const playback = usePlayback(queue, {
+    onEnd: () => onEnd.current(),
+    active: focused,
+    startAt: startParam && Number.isFinite(Number(startParam)) ? Number(startParam) : undefined,
+  });
   const ratings = useRatings(item);
   // downloadarr activity for this title, e.g. more seasons of a show on the way.
   const download = downloadDisplay(
@@ -132,9 +140,12 @@ export default function ItemScreen() {
   const leaving = useRef(false);
   const playerRef = useRef(playback.player);
   playerRef.current = playback.player;
+  // Set as the exit fade starts, so theme music fades with it.
+  const [exiting, setExiting] = useState(false);
   const leave = useCallback(() => {
     if (leaving.current) return;
     leaving.current = true;
+    setExiting(true);
     const p = playerRef.current;
     const startVolume = p?.volume ?? 1;
     const listener = exitFade.addListener(({ value }) => {
@@ -148,6 +159,23 @@ export default function ItemScreen() {
       else router.replace('/');
     });
   }, [exitFade]);
+
+  // Theme music on a show's (or film's) page: it plays over the artwork and the preview,
+  // which stays muted under it, and fades out when the full player takes over or we leave.
+  const themeUrl = useThemeSongUrl(
+    settings.playback.themeMusic && !autoplay && (item?.Type === 'Series' || item?.Type === 'Movie') ? item : undefined,
+  );
+  const themePlaying = !!themeUrl && phase !== 'player' && focused && !exiting;
+  useThemeMusic(themeUrl, themePlaying);
+  useEffect(() => {
+    const p = playback.player;
+    if (!p) return;
+    try {
+      p.muted = !!themeUrl && phase !== 'player';
+    } catch {
+      // Released while leaving.
+    }
+  }, [playback.player, themeUrl, phase]);
 
   // Timeline. Starts once there's something to play; no art means no wait.
   const ready = !!item && !!playback.stream;
@@ -239,6 +267,25 @@ export default function ItemScreen() {
     if (nextEpisode && settings.playback.autoplayNext && !upNextDismissed) playNext();
     else if (!playback.isAudio) leave();
   };
+
+  // Phones (the Jellyfin app's remote control) drive the player while it's on screen.
+  useRemoteHandlers(
+    {
+      pause: playback.pause,
+      resume: playback.resume,
+      togglePlay: playback.togglePlay,
+      stop: leave,
+      seekTo: playback.seekTo,
+      seekBy: playback.seekBy,
+      next: nextEpisode ? playNext : undefined,
+      setVolume: playback.setVolume,
+      changeVolume: playback.changeVolume,
+      toggleMute: playback.toggleMute,
+      selectAudio: playback.selectAudio,
+      selectSubtitle: playback.selectSubtitle,
+    },
+    focused && phase === 'player',
+  );
 
   // A skip or next-episode button takes focus from the hidden controls; OK on it shouldn't also wake them.
   const overlayAction = phase === 'player' && !controlsVisible && !tracksOpen && (upNextShown || !!skipper.segment);

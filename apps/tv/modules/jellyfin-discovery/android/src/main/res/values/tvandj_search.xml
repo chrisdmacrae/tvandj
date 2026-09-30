@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+  <string name="tvandj_search_label">TV and J</string>
+  <string name="tvandj_search_hint">Search your Jellyfin library</string>
+  <string name="tvandj_search_description">Movies and shows in your Jellyfin library</string>
+</resources>

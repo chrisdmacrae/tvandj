@@ -3,7 +3,8 @@
   "android": {
     "modules": [
       "dev.chrisdmacrae.tvandj.discovery.JellyfinDiscoveryModule",
-      "dev.chrisdmacrae.tvandj.discovery.DeviceCapabilitiesModule"
+      "dev.chrisdmacrae.tvandj.discovery.DeviceCapabilitiesModule",
+      "dev.chrisdmacrae.tvandj.discovery.AndroidTvHomeModule"
     ]
   }
 }

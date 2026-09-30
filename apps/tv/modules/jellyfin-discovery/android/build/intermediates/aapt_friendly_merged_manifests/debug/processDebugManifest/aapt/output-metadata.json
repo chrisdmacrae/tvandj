@@ -5,7 +5,7 @@
     "kind": "Directory"
   },
   "applicationId": "dev.chrisdmacrae.tvandj.discovery",
-  "variantName": "release",
+  "variantName": "debug",
   "elements": [
     {
       "type": "SINGLE",

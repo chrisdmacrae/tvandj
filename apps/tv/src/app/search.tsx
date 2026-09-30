@@ -1,4 +1,4 @@
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, ScrollView, View } from 'react-native';
 import { ArrowLeftIcon, IconButton, SelectChip, Shelf, Text, TextField, colors, safeArea, spacing } from '@tv-and-j/design-system';
@@ -24,7 +24,9 @@ function useDebounced<T>(value: T, ms: number) {
  * things to request. One kind at a time, chosen with the Movies / TV toggle.
  */
 export default function SearchScreen() {
-  const [text, setText] = useState('');
+  // q: a search handed over from the TV's system search.
+  const { q } = useLocalSearchParams<{ q?: string }>();
+  const [text, setText] = useState(q ?? '');
   const [kind, setKind] = useState<MediaKind>('movie');
   const query = useDebounced(text, DEBOUNCE_MS);
 

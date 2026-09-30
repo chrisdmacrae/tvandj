@@ -23,13 +23,18 @@ export type Settings = {
     autoplayNext: boolean;
     /** Play a title's YouTube trailer on downloadarr request pages. */
     trailers: boolean;
+    /** Play a show's theme song on its page. */
+    themeMusic: boolean;
   };
+  /** Minutes idle on the browse screens before the screensaver; 0 turns it off. */
+  screensaverMinutes: number;
 };
 
 export const DEFAULT_SETTINGS: Settings = {
   downloadarrUrl: null,
   request: { qualities: ['1080p'], codecs: ['h264', 'hevc'], languages: ['english'] },
-  playback: { autoSkipIntro: false, autoplayNext: true, trailers: true },
+  playback: { autoSkipIntro: false, autoplayNext: true, trailers: true, themeMusic: true },
+  screensaverMinutes: 3,
 };
 
 type SettingsState = {
@@ -48,15 +53,19 @@ const SettingsContext = createContext<SettingsState | null>(null);
 export const TRAILER_IN_FLIGHT_KEY = 'tvandj.trailerInFlight';
 
 /** Per-profile: what each person wants from playback and requests. */
-type ProfileSettings = { request: Settings['request']; playback: Pick<Settings['playback'], 'autoSkipIntro' | 'autoplayNext'> };
-/** Per-TV: where downloadarr is, and whether this device's web view can play trailers. */
-type DeviceSettings = { downloadarrUrl: Settings['downloadarrUrl']; trailers: boolean };
+type ProfileSettings = {
+  request: Settings['request'];
+  playback: Pick<Settings['playback'], 'autoSkipIntro' | 'autoplayNext' | 'themeMusic'>;
+};
+/** Per-TV: where downloadarr is, whether this device's web view can play trailers, and the screensaver. */
+type DeviceSettings = { downloadarrUrl: Settings['downloadarrUrl']; trailers: boolean; screensaverMinutes: number };
 
 const profileKey = (userId: string) => `${SETTINGS_KEY}/${userId}`;
 
 function combine(device: DeviceSettings, profile: ProfileSettings): Settings {
   return {
     downloadarrUrl: device.downloadarrUrl,
+    screensaverMinutes: device.screensaverMinutes,
     request: profile.request,
     playback: { ...profile.playback, trailers: device.trailers },
   };
@@ -65,7 +74,7 @@ function combine(device: DeviceSettings, profile: ProfileSettings): Settings {
 function split(settings: Settings): { device: DeviceSettings; profile: ProfileSettings } {
   const { trailers, ...playback } = settings.playback;
   return {
-    device: { downloadarrUrl: settings.downloadarrUrl, trailers },
+    device: { downloadarrUrl: settings.downloadarrUrl, trailers, screensaverMinutes: settings.screensaverMinutes },
     profile: { request: settings.request, playback },
   };
 }

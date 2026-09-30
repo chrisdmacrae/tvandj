@@ -24,7 +24,10 @@ const PLAY_FAILED = 'This can’t be played right now. Check that the server is 
  * any access to it throws. Owning the lifecycle lets us drop the reference
  * at the moment of release, and rebuild if the screen is shown again.
  */
-export function usePlayback(queue: BaseItemDto[] | undefined, options: { onEnd?: () => void; active?: boolean } = {}) {
+export function usePlayback(
+  queue: BaseItemDto[] | undefined,
+  options: { onEnd?: () => void; active?: boolean; /** Start here (seconds) instead of the resume point, once. */ startAt?: number } = {},
+) {
   // false while another screen is on top: the stream is unloaded so this screen's
   // player doesn't keep buffering. Jellyfin runs one conversion per device, so two
   // players loading at once kill each other's streams.
@@ -155,6 +158,11 @@ export function usePlayback(queue: BaseItemDto[] | undefined, options: { onEnd?:
       .then(async (next) => {
         if (cancelled()) return;
         live.current.stream = next;
+        // A requested start point (e.g. "play from 12:00" on a phone) applies to the first item only.
+        if (trackPrefs.current.startSeconds != null) {
+          const { startSeconds: _used, ...rest } = trackPrefs.current;
+          trackPrefs.current = rest;
+        }
         await player.replaceAsync({ uri: next.url, metadata: { title: item.Name ?? undefined } });
         if (cancelled()) return;
         applyTracks(player, next);
@@ -256,7 +264,18 @@ export function usePlayback(queue: BaseItemDto[] | undefined, options: { onEnd?:
   }, []);
 
   // Choices carry over to the next episode in the queue (same show, usually same tracks).
-  const trackPrefs = useRef<StreamOptions>({});
+  const trackPrefs = useRef<StreamOptions>(options.startAt != null ? { startSeconds: options.startAt } : {});
+
+  const setPlayerVolume = useCallback((volume: number) => {
+    const p = live.current.player;
+    if (!p) return;
+    p.muted = false;
+    p.volume = Math.min(1, Math.max(0, volume));
+  }, []);
+  const toggleMute = useCallback((muted?: boolean) => {
+    const p = live.current.player;
+    if (p) p.muted = muted ?? !p.muted;
+  }, []);
 
   /**
    * Switch audio or subtitles. When the file is playing untouched and the
@@ -357,6 +376,9 @@ export function usePlayback(queue: BaseItemDto[] | undefined, options: { onEnd?:
     seekTo,
     pause,
     resume,
+    changeVolume,
+    setVolume: setPlayerVolume,
+    toggleMute,
     volumeUp: useCallback(() => changeVolume(VOLUME_STEP), [changeVolume]),
     volumeDown: useCallback(() => changeVolume(-VOLUME_STEP), [changeVolume]),
     selectAudio: useCallback((audioIndex: number) => selectTracks({ audioIndex }), [selectTracks]),

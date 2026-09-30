@@ -1,0 +1,4 @@
+int string tvandj_search_description 0x0
+int string tvandj_search_hint 0x0
+int string tvandj_search_label 0x0
+int xml searchable 0x0

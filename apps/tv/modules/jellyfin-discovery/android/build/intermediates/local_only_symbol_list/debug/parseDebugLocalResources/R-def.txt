@@ -1,2 +1,6 @@
 R_DEF: Internal format may change without notice
 local
+string tvandj_search_description
+string tvandj_search_hint
+string tvandj_search_label
+xml searchable

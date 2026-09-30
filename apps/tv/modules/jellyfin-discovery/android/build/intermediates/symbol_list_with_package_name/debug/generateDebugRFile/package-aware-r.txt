@@ -1,1 +1,5 @@
 dev.chrisdmacrae.tvandj.discovery
+string tvandj_search_description
+string tvandj_search_hint
+string tvandj_search_label
+xml searchable
