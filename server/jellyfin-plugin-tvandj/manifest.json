@@ -1,0 +1,20 @@
+[
+  {
+    "guid": "7a1c6f2e-3b4d-4e8a-9f10-5c2d7e8b9a01",
+    "name": "TV and J",
+    "description": "Household settings shared by the TV and J apps on every device.",
+    "overview": "Keeps settings that belong to the whole household (like the downloadarr address) on your Jellyfin server, so the TV and J apps share them across every device and user.",
+    "owner": "chrisdmacrae",
+    "category": "General",
+    "versions": [
+      {
+        "version": "1.0.0.0",
+        "changelog": "https://github.com/chrisdmacrae/tvandj/releases/tag/plugin-v1.0.0",
+        "targetAbi": "12.1.0.0",
+        "sourceUrl": "https://github.com/chrisdmacrae/tvandj/releases/download/plugin-v1.0.0/tvandj_1.0.0.0.zip",
+        "checksum": "5bba714e22b6465bfbffdbc8133589d1",
+        "timestamp": "2026-09-30T05:32:39Z"
+      }
+    ]
+  }
+]
