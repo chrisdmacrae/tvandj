@@ -12,9 +12,10 @@ function initials(name: string) {
   return ((parts[0]?.[0] ?? '') + (parts.length > 1 ? parts[parts.length - 1][0] : '')).toUpperCase() || '?';
 }
 
+/** FNV-1a: spreads similar names across the palette (a plain ×31 hash mod 6 only sums the letters). */
 function paletteFor(name: string) {
-  let h = 0;
-  for (const c of name) h = (h * 31 + c.charCodeAt(0)) >>> 0;
+  let h = 0x811c9dc5;
+  for (const c of name) h = Math.imul(h ^ c.charCodeAt(0), 0x01000193) >>> 0;
   return PALETTE[h % PALETTE.length];
 }
 

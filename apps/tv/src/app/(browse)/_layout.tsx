@@ -1,20 +1,15 @@
 import { Slot, router, usePathname } from 'expo-router';
 import { View } from 'react-native';
-import { AmbientGlow, IconButton, SearchIcon, SettingsIcon, TabBar, colors, spacing } from '@tv-and-j/design-system';
+import { IconButton, SearchIcon, SettingsIcon, TabBar, colors, spacing } from '@tv-and-j/design-system';
+import { FocusGlow } from '../../components/GlowScreen';
 import { UserSwitcher } from '../../components/UserSwitcher';
-import { GlowProvider, useGlowColor } from '../../state/GlowContext';
+import { GlowProvider } from '../../state/GlowContext';
 
 const TABS = [
   { key: '/', label: 'Home' },
   { key: '/movies', label: 'Movies' },
   { key: '/tv', label: 'TV' },
 ];
-
-/** Glow from the top edge in the focused card's colour; stays on the last one when focus moves to the tab bar. */
-function FocusGlow() {
-  const color = useGlowColor();
-  return <AmbientGlow color={color} />;
-}
 
 export default function BrowseLayout() {
   return (

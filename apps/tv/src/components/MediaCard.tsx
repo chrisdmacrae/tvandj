@@ -29,9 +29,10 @@ type MediaCardProps = {
   item: BaseItemDto;
   shape: ArtworkShape;
   hasTVPreferredFocus?: boolean;
+  onFocus?: () => void;
 };
 
-export const MediaCard = memo(function MediaCard({ item, shape, hasTVPreferredFocus }: MediaCardProps) {
+export const MediaCard = memo(function MediaCard({ item, shape, hasTVPreferredFocus, onFocus }: MediaCardProps) {
   const { api } = useAuthedSession();
   const title = item.Type === 'Episode' ? (item.SeriesName ?? item.Name ?? '') : (item.Name ?? '');
   const played = item.UserData?.PlayedPercentage;
@@ -54,8 +55,16 @@ export const MediaCard = memo(function MediaCard({ item, shape, hasTVPreferredFo
       watched={item.UserData?.Played && !played && item.Type !== 'Series'}
       hasTVPreferredFocus={hasTVPreferredFocus}
       {...download}
-      onFocus={() => setGlow(itemGlow(item, shape === 'landscape' ? ['Thumb', 'Primary', 'Backdrop'] : ['Primary']))}
-      onPress={() => item.Id && router.push({ pathname: '/item/[id]', params: { id: item.Id } })}
+      onFocus={() => {
+        setGlow(itemGlow(item, shape === 'landscape' ? ['Thumb', 'Primary', 'Backdrop'] : ['Primary']));
+        onFocus?.();
+      }}
+      onPress={() => {
+        if (!item.Id) return;
+        // A collection (box set) opens as a grid of its titles.
+        if (item.Type === 'BoxSet') router.push({ pathname: '/collection/[id]', params: { id: item.Id } });
+        else router.push({ pathname: '/item/[id]', params: { id: item.Id } });
+      }}
     />
   );
 });

@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <title>TV and J</title>
+  <defs>
+    <linearGradient id="tvj-gradient" x1="96" y1="72" x2="432" y2="440" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#8B7CFF"/>
+      <stop offset="1" stop-color="#3CC8E8"/>
+    </linearGradient>
+  </defs>
+  
+  <g fill="none" stroke="url(#tvj-gradient)" stroke-linecap="round" stroke-linejoin="round">
+    <!-- antennae -->
+    <path d="M256 128 L204 80 M256 128 L308 80" stroke-width="20"/>
+    <!-- screen -->
+    <rect x="80" y="128" width="352" height="268" rx="72" stroke-width="28"/>
+    <!-- stand -->
+    <path d="M200 432 H312" stroke-width="22"/>
+  </g>
+  <!-- play mark, after Jellyfin's: a soft triangle outline around a small solid one -->
+  <path fill="url(#tvj-gradient)" fill-rule="evenodd" d="M207.2 215.0 Q207.2 167.0 248.7 191.0 L330.1 238.0 Q371.7 262.0 330.1 286.0 L248.7 333.0 Q207.2 357.0 207.2 309.0 Z M215.0 228.0 Q215.0 198.0 241.0 213.0 L299.9 247.0 Q325.9 262.0 299.9 277.0 L241.0 311.0 Q215.0 326.0 215.0 296.0 Z"/>
+  <path fill="url(#tvj-gradient)" d="M229.3 246.0 Q229.3 233.0 240.5 239.5 L268.2 255.5 Q279.5 262.0 268.2 268.5 L240.5 284.5 Q229.3 291.0 229.3 278.0 Z"/>
+</svg>

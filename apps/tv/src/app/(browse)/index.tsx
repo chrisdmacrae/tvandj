@@ -7,6 +7,7 @@ import { MediaCard } from '../../components/MediaCard';
 import { RequestedRow } from '../../components/RequestedRow';
 import type { DiscoverItem, MediaKind } from '../../downloadarr/client';
 import { useDownloadarr, usePopular, requestKey, useRequestedItems } from '../../downloadarr/hooks';
+import { useMyList } from '../../jellyfin/browse';
 import { useContinueWatching, useLatest, useLibraryIndex, useLibraryKinds } from '../../jellyfin/library';
 
 type Row =
@@ -43,6 +44,7 @@ export default function Home() {
   const has = (kind: string) => kinds.data?.has(kind) ?? false;
 
   const resume = useContinueWatching();
+  const myList = useMyList();
   const newForYou = useNewForYou();
   // Initial focus goes to whichever section is on top: Requested when there is any.
   const requested = useRequestedItems();
@@ -55,6 +57,7 @@ export default function Home() {
   const rows: Row[] = (
     [
       { key: 'resume', title: 'Continue Watching', kind: 'library', shape: 'landscape', items: resume.data ?? [] },
+      { key: 'mylist', title: 'My List', kind: 'library', shape: 'portrait', items: myList.data ?? [] },
       { key: 'new', title: 'New for you', kind: 'discover', items: newForYou },
       { key: 'movies', title: 'Latest Movies', kind: 'library', shape: 'portrait', items: has('movies') ? (movies.data ?? []) : [] },
       { key: 'shows', title: 'Latest Shows', kind: 'library', shape: 'portrait', items: has('tvshows') ? (shows.data ?? []) : [] },

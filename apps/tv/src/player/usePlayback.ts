@@ -145,6 +145,13 @@ export function usePlayback(queue: BaseItemDto[] | undefined, options: { onEnd?:
     setStream(null);
     setError(null);
     resolveStream(api, auth.userId, item, trackPrefs.current)
+      // The profile's preferred tracks can need the server even when the file plays as-is
+      // (e.g. a separate subtitle file, or audio the TV can't decode).
+      .then((first) =>
+        first.playMethod === 'DirectPlay' && !playsNatively(first)
+          ? resolveStream(api, auth.userId, item, { ...trackPrefs.current, directPlay: false })
+          : first,
+      )
       .then(async (next) => {
         if (cancelled()) return;
         live.current.stream = next;

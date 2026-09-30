@@ -107,6 +107,16 @@ async function loadCatalogue() {
 
 const publicItem = ({ genreIds, ...item }) => item;
 
+// Big Buck Bunny (Creative Commons), so every mock title has a trailer that's allowed to embed.
+const MOCK_TRAILER = 'aqz-KE-bpKQ';
+
+const MOCK_PEOPLE = [
+  { id: '9001', name: 'A. Performer', job: 'Acting' },
+  { id: '9002', name: 'B. Actor', job: 'Acting' },
+  { id: '9003', name: 'C. Player', job: 'Acting' },
+  { id: '9004', name: 'D. Director', job: 'Director' },
+];
+
 // ---- requests ----------------------------------------------------------------
 
 const requests = [];
@@ -176,7 +186,24 @@ async function route(method, url, body) {
     if (m[3]) return ok(catalogue[kind].filter((i) => i.genreIds.includes(Number(m[3]))).map(publicItem));
     const item = catalogue[kind].find((i) => i.id === m[4]);
     if (!item) return fail(404, 'Not found');
-    return ok({ ...publicItem(item), tmdbId: Number(item.id), genre: item.genres, actors: 'A. Performer, B. Actor' });
+    // Made-up cast (no photos) and "more like this" from the same catalogue, so those rows have something to show.
+    const cast = MOCK_PEOPLE.map((p, i) => ({ id: p.id, name: p.name, role: i < 3 ? `Character ${i + 1}` : p.job, department: i < 3 ? 'cast' : 'crew' }));
+    const recommendations = catalogue[kind].filter((i) => i.id !== item.id).slice(0, 10).map(publicItem);
+    return ok({ ...publicItem(item), tmdbId: Number(item.id), genre: item.genres, actors: 'A. Performer, B. Actor', cast, recommendations, trailer: MOCK_TRAILER });
+  }
+
+  if ((m = path.match(/^\/people\/(\d+)$/)) && method === 'GET') {
+    const person = MOCK_PEOPLE.find((p) => p.id === m[1]);
+    if (!person) return fail(404, 'Person not found');
+    return ok({
+      id: person.id,
+      name: person.name,
+      biography: `${person.name} is a made-up person from the mock downloadarr.`,
+      birthday: '1970-01-01',
+      placeOfBirth: 'Nowhere',
+      knownFor: person.job,
+      credits: [...catalogue.movie, ...catalogue.tv].slice(0, 12).map(publicItem),
+    });
   }
 
   if ((m = path.match(/^\/(movies|tv-shows)\/search$/)) && method === 'GET') {

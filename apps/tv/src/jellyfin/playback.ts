@@ -175,7 +175,6 @@ export async function resolveStream(api: Api, userId: string, item: BaseItemDto,
   const { data: full } = await getLibraryApi(api).getItem({ itemId: item.Id, userId });
   const isAudio = full.MediaType === 'Audio';
   const startSeconds = options.startSeconds ?? (full.UserData?.PlaybackPositionTicks ?? 0) / TICKS_PER_SECOND;
-  const subtitleIndex = options.subtitleIndex ?? -1; // subtitles start off
 
   const { data } = await getMediaInfoApi(api).getPostedPlaybackInfo({
     itemId: item.Id,
@@ -189,8 +188,10 @@ export async function resolveStream(api: Api, userId: string, item: BaseItemDto,
       EnableTranscoding: true,
       AllowVideoStreamCopy: true,
       AllowAudioStreamCopy: true,
+      // Left unset until someone picks, so Jellyfin chooses by the profile's
+      // audio and subtitle preferences (language, when to show subtitles).
       AudioStreamIndex: options.audioIndex,
-      SubtitleStreamIndex: subtitleIndex,
+      SubtitleStreamIndex: options.subtitleIndex,
     },
   });
 
@@ -227,7 +228,7 @@ export async function resolveStream(api: Api, userId: string, item: BaseItemDto,
     audio: tracks(streams, 'Audio'),
     subtitles: tracks(streams, 'Subtitle'),
     audioIndex: options.audioIndex ?? source.DefaultAudioStreamIndex ?? undefined,
-    subtitleIndex,
+    subtitleIndex: options.subtitleIndex ?? source.DefaultSubtitleStreamIndex ?? -1,
     trickplay: isAudio ? undefined : pickTrickplay(full, source.Id),
   };
 }

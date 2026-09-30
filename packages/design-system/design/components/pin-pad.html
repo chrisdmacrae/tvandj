@@ -1,0 +1,24 @@
+<!-- @dsCard group="Components" -->
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PinPad</title><link rel="stylesheet" href="../components.css"></head>
+<body><div class="preview">
+<div class="row" style="gap:64px;align-items:flex-start">
+<div><span class="t-caption tone-secondary">Two digits in, "5" focused</span>
+<div class="ds-pin" style="margin-top:16px">
+  <div class="ds-pin__dots"><i class="ds-pin__dot is-filled"></i><i class="ds-pin__dot is-filled"></i><i class="ds-pin__dot"></i><i class="ds-pin__dot"></i></div>
+  <div class="ds-pin__error"></div>
+  <div class="ds-pin__keys">
+    <button class="ds-pin__key">1</button><button class="ds-pin__key">2</button><button class="ds-pin__key">3</button>
+    <button class="ds-pin__key">4</button><button class="ds-pin__key is-focused">5</button><button class="ds-pin__key">6</button>
+    <button class="ds-pin__key">7</button><button class="ds-pin__key">8</button><button class="ds-pin__key">9</button>
+    <span class="ds-pin__key ds-pin__key--blank"></span><button class="ds-pin__key">0</button><button class="ds-pin__key" aria-label="Delete">⌫</button>
+  </div>
+</div></div>
+<div><span class="t-caption tone-secondary">Wrong PIN</span>
+<div class="ds-pin is-error" style="margin-top:16px">
+  <div class="ds-pin__dots"><i class="ds-pin__dot is-filled"></i><i class="ds-pin__dot is-filled"></i><i class="ds-pin__dot is-filled"></i><i class="ds-pin__dot is-filled"></i></div>
+  <div class="ds-pin__error">Wrong PIN. Try again.</div>
+</div></div>
+</div>
+</div></body></html>

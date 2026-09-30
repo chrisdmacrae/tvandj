@@ -4,6 +4,7 @@ import { ScrollView, View } from 'react-native';
 import {
   ArrowLeftIcon,
   Button,
+  Dropdown,
   IconButton,
   SelectChip,
   Text,
@@ -12,7 +13,11 @@ import {
   safeArea,
   spacing,
 } from '@tv-and-j/design-system';
+import type { SubtitlePlaybackMode } from '@jellyfin/sdk/lib/generated-client/models';
+import { PinSetup } from '../components/PinSetup';
 import { Downloadarr, findDownloadarr, normalizeBaseUrl } from '../downloadarr/client';
+import { isRestricted, ratingLimitLabel, useCurrentUser, useParentalRatings, useUpdateUserConfiguration } from '../jellyfin/users';
+import { hasPin } from '../state/profilePins';
 import { useAuthedSession } from '../state/SessionContext';
 import { useSettings, type Codec, type Language, type Quality, type Settings } from '../state/SettingsContext';
 
@@ -30,6 +35,31 @@ const LANGUAGES: { value: Language; label: string }[] = [
   { value: 'german', label: 'German' },
   { value: 'spanish', label: 'Spanish' },
   { value: 'japanese', label: 'Japanese' },
+];
+
+/** Jellyfin's language codes (ISO 639-2). Empty means no preference: the file's default. */
+const TRACK_LANGUAGES = [
+  { value: '', label: 'No preference' },
+  { value: 'eng', label: 'English' },
+  { value: 'fre', label: 'French' },
+  { value: 'ger', label: 'German' },
+  { value: 'spa', label: 'Spanish' },
+  { value: 'ita', label: 'Italian' },
+  { value: 'por', label: 'Portuguese' },
+  { value: 'dut', label: 'Dutch' },
+  { value: 'swe', label: 'Swedish' },
+  { value: 'jpn', label: 'Japanese' },
+  { value: 'kor', label: 'Korean' },
+  { value: 'chi', label: 'Chinese' },
+  { value: 'hin', label: 'Hindi' },
+];
+
+const SUBTITLE_MODES: { value: SubtitlePlaybackMode; label: string }[] = [
+  { value: 'Default', label: 'When the file says to' },
+  { value: 'Smart', label: 'When the audio isn’t my language' },
+  { value: 'OnlyForced', label: 'Only for foreign dialogue' },
+  { value: 'Always', label: 'Always' },
+  { value: 'None', label: 'Never' },
 ];
 
 function Section({ title, description, children }: { title: string; description?: string; children: ReactNode }) {
@@ -86,9 +116,24 @@ export default function SettingsScreen() {
 
   const setRequest = (patch: Partial<Settings['request']>) => update({ request: { ...settings.request, ...patch } });
 
+  // This profile in Jellyfin: its content limits and language preferences.
+  const user = useCurrentUser().data;
+  const ratings = useParentalRatings().data;
+  const restricted = isRestricted(user?.Policy);
+  const limit = ratingLimitLabel(user?.Policy, ratings);
+  const config = user?.Configuration;
+  const updateConfig = useUpdateUserConfiguration();
+
+  // This profile's PIN on this TV.
+  const [pinned, setPinned] = useState<boolean | null>(null);
+  const [pinDialog, setPinDialog] = useState<'set' | 'remove' | null>(null);
+  useEffect(() => {
+    hasPin(auth.userId).then(setPinned);
+  }, [auth.userId]);
+
   // Not set up yet: look for downloadarr next to Jellyfin and pre-fill it if it answers.
   useEffect(() => {
-    if (settings.downloadarrUrl) return;
+    if (settings.downloadarrUrl || restricted) return;
     let cancelled = false;
     setCheck({ state: 'checking', message: 'Looking for downloadarr on your network…' });
     findDownloadarr(server.address).then((found) => {
@@ -103,7 +148,7 @@ export default function SettingsScreen() {
     return () => {
       cancelled = true;
     };
-  }, [settings.downloadarrUrl, server.address]);
+  }, [settings.downloadarrUrl, server.address, restricted]);
 
   const connect = async () => {
     if (!address.trim()) return setCheck({ state: 'error', message: 'Enter downloadarr’s address.' });
@@ -147,8 +192,59 @@ export default function SettingsScreen() {
           <Section title="Jellyfin" description={`Signed in as ${auth.userName} on ${server.name} (${server.address})`}>
             <View style={{ flexDirection: 'row', gap: spacing.sm }}>
               <Button label="Sign out" variant="secondary" size="sm" hasTVPreferredFocus onPress={signOut} />
-              <Button label="Change server" variant="secondary" size="sm" onPress={forgetServer} />
+              {/* Changing server forgets every profile on this TV: not for profiles with content limits. */}
+              {restricted ? null : <Button label="Change server" variant="secondary" size="sm" onPress={forgetServer} />}
             </View>
+          </Section>
+
+          <Section
+            title="Profile"
+            description={
+              limit
+                ? `${limit}, set in Jellyfin. Discovery and requests are turned off for this profile, since they can’t be filtered by rating.`
+                : 'A PIN stops others on this TV switching into your profile.'
+            }
+          >
+            <View style={{ flexDirection: 'row', gap: spacing.sm }}>
+              {pinned ? (
+                <>
+                  <Button label="Change PIN" variant="secondary" size="sm" onPress={() => setPinDialog('set')} />
+                  <Button label="Remove PIN" variant="ghost" size="sm" onPress={() => setPinDialog('remove')} />
+                </>
+              ) : pinned === false ? (
+                <Button label="Set a PIN" variant="secondary" size="sm" onPress={() => setPinDialog('set')} />
+              ) : null}
+            </View>
+          </Section>
+
+          <Section title="Languages" description="Saved to your Jellyfin account, so your other Jellyfin apps use them too.">
+            {config ? (
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm }}>
+                <Dropdown
+                  label="Audio"
+                  value={config.AudioLanguagePreference ?? ''}
+                  options={TRACK_LANGUAGES}
+                  onChange={(v) => updateConfig.mutate({ AudioLanguagePreference: v || null })}
+                />
+                <Dropdown
+                  label="Subtitles"
+                  value={config.SubtitleLanguagePreference ?? ''}
+                  options={TRACK_LANGUAGES}
+                  onChange={(v) => updateConfig.mutate({ SubtitleLanguagePreference: v || null })}
+                />
+                <Dropdown
+                  label="Show subtitles"
+                  value={config.SubtitleMode ?? 'Default'}
+                  options={SUBTITLE_MODES}
+                  onChange={(v) => updateConfig.mutate({ SubtitleMode: v })}
+                />
+              </View>
+            ) : null}
+            {updateConfig.isError ? (
+              <Text variant="caption" style={{ color: colors.danger }}>
+                Couldn’t save to Jellyfin. Try again.
+              </Text>
+            ) : null}
           </Section>
 
           <Section title="Playback">
@@ -163,73 +259,97 @@ export default function SettingsScreen() {
                 selected={settings.playback.autoplayNext}
                 onPress={() => update({ playback: { ...settings.playback, autoplayNext: !settings.playback.autoplayNext } })}
               />
-            </View>
-          </Section>
-
-          <Section
-            title="downloadarr"
-            description="Optional. Connect downloadarr to discover new movies and shows, request them, and follow their downloads."
-          >
-            <TextField
-              label="Address"
-              placeholder="192.168.1.20:3001"
-              value={address}
-              onChangeText={(text) => {
-                setAddress(text);
-                setCheck({ state: 'idle' });
-              }}
-              onSubmitEditing={connect}
-              error={check.state === 'error' ? check.message : undefined}
-              hint={
-                check.state === 'ok' || check.state === 'found' || (check.state === 'checking' && check.message)
-                  ? check.message
-                  : settings.downloadarrUrl
-                    ? `Connected to ${settings.downloadarrUrl}`
-                    : undefined
-              }
-              autoCapitalize="none"
-              autoCorrect={false}
-              keyboardType="url"
-            />
-            <View style={{ flexDirection: 'row', gap: spacing.sm }}>
-              <Button
-                label={check.state === 'checking' && !check.message ? 'Checking…' : 'Connect'}
-                size="sm"
-                onPress={connect}
-              />
-              {settings.downloadarrUrl ? (
-                <Button
-                  label="Disconnect"
-                  variant="ghost"
-                  size="sm"
-                  onPress={() => {
-                    update({ downloadarrUrl: null });
-                    setAddress('');
-                    setCheck({ state: 'idle' });
-                  }}
+              {settings.downloadarrUrl && !restricted ? (
+                <SelectChip
+                  label="Play trailers on request pages"
+                  selected={settings.playback.trailers}
+                  onPress={() => update({ playback: { ...settings.playback, trailers: !settings.playback.trailers } })}
                 />
               ) : null}
             </View>
           </Section>
 
-          {settings.downloadarrUrl ? (
-            <Section title="Requests" description="What downloadarr looks for when you request something. Releases that don’t match are skipped.">
-              <Text variant="label" tone="secondary">
-                Quality
-              </Text>
-              <Choices options={QUALITIES} selected={settings.request.qualities} onChange={(qualities) => setRequest({ qualities })} />
-              <Text variant="label" tone="secondary">
-                Video format
-              </Text>
-              <Choices options={CODECS} selected={settings.request.codecs} onChange={(codecs) => setRequest({ codecs })} />
-              <Text variant="label" tone="secondary">
-                Language
-              </Text>
-              <Choices options={LANGUAGES} selected={settings.request.languages} onChange={(languages) => setRequest({ languages })} />
-            </Section>
-          ) : null}
+          {/* The downloadarr connection is the TV's, so profiles with content limits can't change it. */}
+          {restricted ? null : (
+            <>
+              <Section
+                title="downloadarr"
+                description="Optional. Connect downloadarr to discover new movies and shows, request them, and follow their downloads."
+              >
+                <TextField
+                  label="Address"
+                  placeholder="192.168.1.20:3001"
+                  value={address}
+                  onChangeText={(text) => {
+                    setAddress(text);
+                    setCheck({ state: 'idle' });
+                  }}
+                  onSubmitEditing={connect}
+                  error={check.state === 'error' ? check.message : undefined}
+                  hint={
+                    check.state === 'ok' || check.state === 'found' || (check.state === 'checking' && check.message)
+                      ? check.message
+                      : settings.downloadarrUrl
+                        ? `Connected to ${settings.downloadarrUrl}`
+                        : undefined
+                  }
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  keyboardType="url"
+                />
+                <View style={{ flexDirection: 'row', gap: spacing.sm }}>
+                  <Button
+                    label={check.state === 'checking' && !check.message ? 'Checking…' : 'Connect'}
+                    size="sm"
+                    onPress={connect}
+                  />
+                  {settings.downloadarrUrl ? (
+                    <Button
+                      label="Disconnect"
+                      variant="ghost"
+                      size="sm"
+                      onPress={() => {
+                        update({ downloadarrUrl: null });
+                        setAddress('');
+                        setCheck({ state: 'idle' });
+                      }}
+                    />
+                  ) : null}
+                </View>
+              </Section>
+
+              {settings.downloadarrUrl ? (
+                <Section title="Requests" description="What downloadarr looks for when you request something. Releases that don’t match are skipped.">
+                  <Text variant="label" tone="secondary">
+                    Quality
+                  </Text>
+                  <Choices options={QUALITIES} selected={settings.request.qualities} onChange={(qualities) => setRequest({ qualities })} />
+                  <Text variant="label" tone="secondary">
+                    Video format
+                  </Text>
+                  <Choices options={CODECS} selected={settings.request.codecs} onChange={(codecs) => setRequest({ codecs })} />
+                  <Text variant="label" tone="secondary">
+                    Language
+                  </Text>
+                  <Choices options={LANGUAGES} selected={settings.request.languages} onChange={(languages) => setRequest({ languages })} />
+                </Section>
+              ) : null}
+            </>
+          )}
         </View>
       </ScrollView>
+
+      {pinDialog ? (
+        <PinSetup
+          userId={auth.userId}
+          hasPin={!!pinned}
+          remove={pinDialog === 'remove'}
+          onDone={(changed) => {
+            setPinDialog(null);
+            if (changed) hasPin(auth.userId).then(setPinned);
+          }}
+        />
+      ) : null}
     </View>
   );
 }

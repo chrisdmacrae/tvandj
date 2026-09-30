@@ -1,12 +1,12 @@
 import type { BaseItemDto } from '@jellyfin/sdk/lib/generated-client/models';
 import { useEffect, useMemo, useState } from 'react';
-import { Animated, FlatList, TVFocusGuideView, View } from 'react-native';
-import Svg, { Defs, LinearGradient, Rect, Stop } from 'react-native-svg';
-import { Dropdown, PosterCard, Text, colors, safeArea, spacing } from '@tv-and-j/design-system';
+import { FlatList, TVFocusGuideView, View } from 'react-native';
+import { Button, Dropdown, PosterCard, Text, safeArea, spacing } from '@tv-and-j/design-system';
 import type { RequestSeason } from '../downloadarr/client';
 import { useRequestSeasons } from '../downloadarr/hooks';
 import { seasonProgress, type TvProgress } from '../downloadarr/tvStatus';
 import { landscapeUrl } from '../jellyfin/images';
+import { useTogglePlayed } from '../jellyfin/browse';
 import { useEpisodes, useSeasons } from '../jellyfin/library';
 import { useAuthedSession } from '../state/SessionContext';
 
@@ -100,6 +100,8 @@ export function SeasonBrowser({ series, tmdbId, initialSeason, onPlayEpisode, on
   }, [seasons, selected, initialSeason]);
 
   const season = seasons.find((s) => s.number === selected);
+  const togglePlayed = useTogglePlayed();
+  const seasonWatched = !!season?.jellyfin?.UserData?.Played;
   const episodes = useEpisodes(series?.Id ?? undefined, season?.jellyfin?.Id ?? undefined).data;
 
   const cards = useMemo<Card[]>(() => {
@@ -134,8 +136,17 @@ export function SeasonBrowser({ series, tmdbId, initialSeason, onPlayEpisode, on
         by. Any Up/Down into this row lands on the dropdown; into the next row, on the
         last-focused episode.
       */}
-      <FocusGuide autoFocus style={{ width: '100%', paddingHorizontal: safeArea.horizontal }}>
+      <FocusGuide autoFocus style={{ width: '100%', paddingHorizontal: safeArea.horizontal, flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
         <Dropdown label="Season" value={selected ?? seasons[0].number} options={options} onChange={setSelected} onFocus={onFocus} />
+        {season?.jellyfin?.Id ? (
+          <Button
+            label={seasonWatched ? 'Mark season unwatched' : 'Mark season watched'}
+            size="sm"
+            variant="ghost"
+            onFocus={onFocus}
+            onPress={() => season.jellyfin?.Id && !togglePlayed.isPending && togglePlayed.mutate({ itemId: season.jellyfin.Id, on: !seasonWatched })}
+          />
+        ) : null}
       </FocusGuide>
       <FocusGuide autoFocus style={{ width: '100%' }}>
         <FlatList
@@ -186,55 +197,4 @@ function episodeSubtitle(e: BaseItemDto) {
     return `${Math.round((e.RunTimeTicks - e.UserData.PlaybackPositionTicks) / 600_000_000)}m left`;
   }
   return e.RunTimeTicks ? `${Math.round(e.RunTimeTicks / 600_000_000)}m` : undefined;
-}
-
-/** Season dropdown + one row of landscape episode cards with titles. */
-export const SEASONS_HEIGHT = 250;
-
-/**
- * SeasonBrowser as a block in a scrolling page, below a summary. Its top edge
- * fades in over the artwork behind; below that it's solid, so it covers the
- * artwork as it scrolls up.
- */
-export function SeasonsBlock({ opacity, ...props }: SeasonBrowserProps & { opacity?: Animated.Value | Animated.AnimatedInterpolation<number> }) {
-  return (
-    <Animated.View style={{ opacity: opacity ?? 1 }}>
-      <Svg width="100%" height={spacing.xxxl}>
-        <Defs>
-          <LinearGradient id="seasons-block-scrim" x1="0" y1="0" x2="0" y2="1">
-            <Stop offset="0" stopColor={colors.canvas} stopOpacity={0} />
-            <Stop offset="1" stopColor={colors.canvas} stopOpacity={1} />
-          </LinearGradient>
-        </Defs>
-        <Rect x="0" y="0" width="100%" height="100%" fill="url(#seasons-block-scrim)" />
-      </Svg>
-      <View style={{ backgroundColor: colors.canvas, paddingBottom: safeArea.vertical }}>
-        <SeasonBrowser {...props} />
-      </View>
-    </Animated.View>
-  );
-}
-
-/**
- * SeasonBrowser pinned along the bottom of a summary screen, over a gradient
- * so it reads on top of artwork. Screens reserve SEASONS_HEIGHT above it.
- */
-export function SeasonsSection({ opacity, ...props }: SeasonBrowserProps & { opacity?: Animated.Value | Animated.AnimatedInterpolation<number> }) {
-  return (
-    <Animated.View style={{ position: 'absolute', left: 0, right: 0, bottom: 0, height: SEASONS_HEIGHT + 40, opacity: opacity ?? 1 }}>
-      <Svg style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }} width="100%" height="100%">
-        <Defs>
-          <LinearGradient id="seasons-scrim" x1="0" y1="0" x2="0" y2="1">
-            <Stop offset="0" stopColor={colors.canvas} stopOpacity={0} />
-            <Stop offset="0.2" stopColor={colors.canvas} stopOpacity={0.85} />
-            <Stop offset="1" stopColor={colors.canvas} stopOpacity={1} />
-          </LinearGradient>
-        </Defs>
-        <Rect x="0" y="0" width="100%" height="100%" fill="url(#seasons-scrim)" />
-      </Svg>
-      <View style={{ flex: 1, justifyContent: 'flex-end', paddingBottom: spacing.sm }}>
-        <SeasonBrowser {...props} />
-      </View>
-    </Animated.View>
-  );
 }

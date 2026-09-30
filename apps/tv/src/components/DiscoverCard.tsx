@@ -32,13 +32,14 @@ type DiscoverCardProps = {
   item: DiscoverItem;
   kind: MediaKind;
   hasTVPreferredFocus?: boolean;
+  onFocus?: () => void;
 };
 
 /** TMDB serves several sizes; cards are ~240px wide, so w342 is plenty (w500/original cost far more to decode). */
 const cardSized = (url?: string) => url?.replace(/\/t\/p\/(w\d+|original)\//, '/t/p/w342/');
 
 /** A downloadarr (TMDB) title. Opens in Jellyfin if it's already there, otherwise the request page. */
-export const DiscoverCard = memo(function DiscoverCard({ item, kind, hasTVPreferredFocus }: DiscoverCardProps) {
+export const DiscoverCard = memo(function DiscoverCard({ item, kind, hasTVPreferredFocus, onFocus }: DiscoverCardProps) {
   const { api } = useAuthedSession();
   const setGlow = useSetGlow();
   const status = useMediaStatus(kind, item.id);
@@ -56,7 +57,10 @@ export const DiscoverCard = memo(function DiscoverCard({ item, kind, hasTVPrefer
       imageUri={poster}
       hasTVPreferredFocus={hasTVPreferredFocus}
       {...downloadDisplay(shown)}
-      onFocus={() => poster && setGlow(imageGlow(poster))}
+      onFocus={() => {
+        if (poster) setGlow(imageGlow(poster));
+        onFocus?.();
+      }}
       onPress={() =>
         status.state === 'available'
           ? router.push({ pathname: '/item/[id]', params: { id: status.jellyfinId } })

@@ -19,3 +19,4 @@ export * from './components/SelectChip';
 export * from './components/Dropdown';
 export * from './components/AmbientGlow';
 export * from './components/Avatar';
+export * from './components/PinPad';

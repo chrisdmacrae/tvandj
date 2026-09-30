@@ -301,3 +301,20 @@ body {
 .ds-avatar img { width: 100%; height: 100%; object-fit: cover; }
 .ds-avatar-button { display: inline-flex; padding: 1.5px; border-radius: 50%; border: var(--focus-ring-width) solid transparent; }
 .ds-avatar-button.is-focused { border-color: var(--color-focus-ring); transform: scale(1.1); }
+
+/* PinPad — dots for digits entered, then a 3×4 keypad (1–9, blank, 0, delete) the D-pad moves around */
+.ds-pin { display: flex; flex-direction: column; align-items: center; gap: var(--space-lg); }
+.ds-pin__dots { display: flex; gap: var(--space-md); }
+.ds-pin__dot { width: 16px; height: 16px; border-radius: 50%; border: 2px solid var(--color-text-secondary); }
+.ds-pin__dot.is-filled { background: var(--color-text-primary); border-color: var(--color-text-primary); }
+.ds-pin.is-error .ds-pin__dot { border-color: var(--color-danger); }
+.ds-pin.is-error .ds-pin__dot.is-filled { background: var(--color-danger); }
+.ds-pin__error { min-height: 18px; color: var(--color-danger); font-size: var(--type-caption-size); line-height: var(--type-caption-line); }
+.ds-pin__keys { display: grid; grid-template-columns: repeat(3, 56px); gap: var(--space-sm); }
+.ds-pin__key {
+  width: 56px; height: 56px; border-radius: 50%; border: 0; display: grid; place-items: center;
+  background: var(--color-surface-raised); color: var(--color-text-primary);
+  font-size: var(--type-title-size); font-weight: var(--type-title-weight);
+}
+.ds-pin__key.is-focused { background: var(--color-text-primary); color: var(--color-text-inverse); transform: scale(1.1); }
+.ds-pin__key--blank { visibility: hidden; }

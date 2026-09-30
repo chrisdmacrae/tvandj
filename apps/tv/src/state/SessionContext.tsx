@@ -34,6 +34,14 @@ type SessionState = {
   signOut: () => Promise<void>;
   /** Forget the server and every user, and restart onboarding. */
   forgetServer: () => Promise<void>;
+  /**
+   * Whether someone has picked who's watching since the app started. Until
+   * then only the "Who's watching?" screen is reachable (and a profile's PIN,
+   * if it has one, stands between it and everything else).
+   */
+  profileChosen: boolean;
+  /** Mark the current profile as chosen for this session. */
+  chooseProfile: () => void;
 };
 
 const SessionContext = createContext<SessionState | null>(null);
@@ -47,6 +55,9 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const [jellyfin, setJellyfin] = useState<Jellyfin | null>(null);
   const [server, setServer] = useState<ServerInfo | null>(null);
   const [stored, setStored] = useState<Stored>({ current: null, accounts: [] });
+  // Deliberately not persisted: every launch asks who's watching.
+  const [profileChosen, setProfileChosen] = useState(false);
+  const chooseProfile = useCallback(() => setProfileChosen(true), []);
 
   useEffect(() => {
     (async () => {
@@ -91,33 +102,40 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     setServer(next);
   }, []);
 
+  // Signing in or switching is choosing who's watching.
   const signIn = useCallback(
-    (next: Auth) =>
-      update((prev) => ({
+    async (next: Auth) => {
+      await update((prev) => ({
         current: next.userId,
         accounts: [...prev.accounts.filter((a) => a.userId !== next.userId), next],
-      })),
+      }));
+      setProfileChosen(true);
+    },
     [update],
   );
 
   const switchUser = useCallback(
-    (userId: string) => update((prev) => (prev.accounts.some((a) => a.userId === userId) ? { ...prev, current: userId } : prev)),
+    async (userId: string) => {
+      await update((prev) => (prev.accounts.some((a) => a.userId === userId) ? { ...prev, current: userId } : prev));
+      setProfileChosen(true);
+    },
     [update],
   );
 
-  const signOut = useCallback(
-    () =>
-      update((prev) => {
-        const accounts = prev.accounts.filter((a) => a.userId !== prev.current);
-        return { current: accounts[0]?.userId ?? null, accounts };
-      }),
-    [update],
-  );
+  // Signing out hands the TV to whoever else is saved here, so ask who's watching again.
+  const signOut = useCallback(async () => {
+    await update((prev) => {
+      const accounts = prev.accounts.filter((a) => a.userId !== prev.current);
+      return { current: accounts[0]?.userId ?? null, accounts };
+    });
+    setProfileChosen(false);
+  }, [update]);
 
   const forgetServer = useCallback(async () => {
     await Promise.all([secureStorage.remove(ACCOUNTS_KEY), AsyncStorage.removeItem(SERVER_KEY)]);
     setStored({ current: null, accounts: [] });
     setServer(null);
+    setProfileChosen(false);
   }, []);
 
   const auth = useMemo(() => stored.accounts.find((a) => a.userId === stored.current) ?? null, [stored]);
@@ -127,8 +145,22 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   );
 
   const value = useMemo(
-    () => ({ ready, server, auth, accounts: stored.accounts, jellyfin, api, saveServer, signIn, switchUser, signOut, forgetServer }),
-    [ready, server, auth, stored.accounts, jellyfin, api, saveServer, signIn, switchUser, signOut, forgetServer],
+    () => ({
+      ready,
+      server,
+      auth,
+      accounts: stored.accounts,
+      jellyfin,
+      api,
+      saveServer,
+      signIn,
+      switchUser,
+      signOut,
+      forgetServer,
+      profileChosen,
+      chooseProfile,
+    }),
+    [ready, server, auth, stored.accounts, jellyfin, api, saveServer, signIn, switchUser, signOut, forgetServer, profileChosen, chooseProfile],
   );
   return <SessionContext value={value}>{children}</SessionContext>;
 }

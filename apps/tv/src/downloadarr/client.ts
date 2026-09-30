@@ -36,6 +36,35 @@ export type DiscoverDetails = DiscoverItem & {
   network?: string;
   status?: string;
   episodes?: number;
+  /** Top-billed cast, then the director (movies) or creators (shows). Newer downloadarr only. */
+  cast?: CreditPerson[];
+  /** TMDB's "more like this". Newer downloadarr only. */
+  recommendations?: DiscoverItem[];
+  /** YouTube key of the title's trailer. Newer downloadarr only. */
+  trailer?: string;
+};
+
+/** A cast or crew member; `id` is their TMDB person id. */
+export type CreditPerson = {
+  id: string;
+  name: string;
+  /** Character played, or job (Director, Creator). */
+  role?: string;
+  photo?: string;
+  department: 'cast' | 'crew';
+};
+
+export type PersonDetails = {
+  id: string;
+  name: string;
+  photo?: string;
+  biography?: string;
+  birthday?: string;
+  deathday?: string;
+  placeOfBirth?: string;
+  knownFor?: string;
+  /** Their movies and shows, most popular first. */
+  credits: DiscoverItem[];
 };
 
 export type Genre = { id: number; name: string };
@@ -186,6 +215,10 @@ export class Downloadarr {
 
   details(kind: MediaKind, tmdbId: string) {
     return this.call<DiscoverDetails>(`/${paths[kind]}/${encodeURIComponent(tmdbId)}`);
+  }
+
+  person(tmdbId: string) {
+    return this.call<PersonDetails>(`/people/${encodeURIComponent(tmdbId)}`);
   }
 
   /** All requests (paged 100 at a time). There's no lookup by TMDB id, so callers index these. */

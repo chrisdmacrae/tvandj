@@ -42,3 +42,9 @@ export function logoUrl(api: Api, item: BaseItemDto, maxWidth = 600): string | u
   if (item.ParentLogoItemId && item.ParentLogoImageTag) return url(api, item.ParentLogoItemId, 'Logo', item.ParentLogoImageTag, maxWidth);
   return undefined;
 }
+
+/** A cast or crew member's photo (People entries carry their own image tag). */
+export function personImageUrl(api: Api, person: { Id?: string | null; PrimaryImageTag?: string | null }, maxWidth = 160): string | undefined {
+  if (!person.Id || !person.PrimaryImageTag) return undefined;
+  return url(api, person.Id, 'Primary', person.PrimaryImageTag, maxWidth);
+}

@@ -1,6 +1,7 @@
 import { useMutation, useQueries, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useCallback, useMemo } from 'react';
 import { useJellyfinId, useLibraryIndex } from '../jellyfin/library';
+import { isRestricted, useCurrentUser } from '../jellyfin/users';
 import { useSettings } from '../state/SettingsContext';
 import { Downloadarr, type DiscoverDetails, type DiscoverItem, type MediaKind, type TorrentRequest } from './client';
 import { showProgress, type TvProgress } from './tvStatus';
@@ -8,9 +9,22 @@ import { showProgress, type TvProgress } from './tvStatus';
 const ACTIVE = new Set(['PENDING', 'SEARCHING', 'FOUND', 'DOWNLOADING']);
 
 /** null when the optional integration isn't configured. */
+/**
+ * The downloadarr client, or null when it isn't set up, or when the profile
+ * watching has content limits. Jellyfin filters its own library by a
+ * profile's rating limit, but downloadarr's discovery (all of TMDB) has no
+ * ratings to filter by, so restricted profiles don't get discovery or
+ * requests at all. Null until the profile's limits are known, so nothing
+ * flashes up first.
+ */
 export function useDownloadarr(): Downloadarr | null {
   const { settings } = useSettings();
-  return useMemo(() => (settings.downloadarrUrl ? new Downloadarr(settings.downloadarrUrl) : null), [settings.downloadarrUrl]);
+  const user = useCurrentUser();
+  const allowed = !!user.data && !isRestricted(user.data.Policy);
+  return useMemo(
+    () => (settings.downloadarrUrl && allowed ? new Downloadarr(settings.downloadarrUrl) : null),
+    [settings.downloadarrUrl, allowed],
+  );
 }
 
 export function useDiscoverGenres(kind: MediaKind) {
@@ -50,6 +64,17 @@ export function useDiscoverDetails(kind: MediaKind, tmdbId: string) {
     enabled: !!client,
     staleTime: 60 * 60 * 1000,
     queryFn: () => client!.details(kind, tmdbId),
+  });
+}
+
+/** An actor or director and their movies and shows, from TMDB via downloadarr. */
+export function usePersonDetails(tmdbId: string) {
+  const client = useDownloadarr();
+  return useQuery({
+    queryKey: ['da', client?.baseUrl, 'person', tmdbId],
+    enabled: !!client,
+    staleTime: 60 * 60 * 1000,
+    queryFn: () => client!.person(tmdbId),
   });
 }
 

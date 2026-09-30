@@ -18,7 +18,7 @@ const queryClient = new QueryClient({
 });
 
 function RootStack() {
-  const { ready, auth } = useSession();
+  const { ready, auth, profileChosen } = useSession();
   // Wait for storage so we don't flash onboarding at returning users.
   if (!ready) return null;
 
@@ -28,12 +28,20 @@ function RootStack() {
         <Stack.Screen name="onboarding" />
       </Stack.Protected>
       <Stack.Protected guard={auth !== null}>
-        <Stack.Screen name="(browse)" />
-        <Stack.Screen name="item/[id]" options={{ animation: 'fade' }} />
-        <Stack.Screen name="discover/[kind]/[tmdbId]" options={{ animation: 'fade' }} />
-        <Stack.Screen name="settings" options={{ animation: 'fade' }} />
-        <Stack.Screen name="search" options={{ animation: 'fade' }} />
+        {/* Signed in: first, who's watching (and their PIN, if any). */}
+        <Stack.Screen name="profiles" options={{ animation: 'fade' }} />
         <Stack.Screen name="switch-user" options={{ animation: 'fade' }} />
+        <Stack.Protected guard={profileChosen}>
+          <Stack.Screen name="(browse)" />
+          <Stack.Screen name="item/[id]" options={{ animation: 'fade' }} />
+          <Stack.Screen name="discover/[kind]/[tmdbId]" options={{ animation: 'fade' }} />
+          <Stack.Screen name="settings" options={{ animation: 'fade' }} />
+          <Stack.Screen name="search" options={{ animation: 'fade' }} />
+          <Stack.Screen name="library/[kind]" options={{ animation: 'fade' }} />
+          <Stack.Screen name="collection/[id]" options={{ animation: 'fade' }} />
+          <Stack.Screen name="person/[id]" options={{ animation: 'fade' }} />
+          <Stack.Screen name="people/[tmdbId]" options={{ animation: 'fade' }} />
+        </Stack.Protected>
       </Stack.Protected>
     </Stack>
   );

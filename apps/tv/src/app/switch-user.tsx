@@ -3,24 +3,37 @@ import { useEffect, useState } from 'react';
 import { View } from 'react-native';
 import { ArrowLeftIcon, Avatar, Button, IconButton, Text, TextField, colors, radii, safeArea, spacing } from '@tv-and-j/design-system';
 import { SignInError, pollQuickConnect, signInWithPassword, startQuickConnect, type QuickConnectSession } from '../jellyfin/auth';
+import { goHome } from '../lib/navigation';
+import { setPin } from '../state/profilePins';
 import { useAuthedSession } from '../state/SessionContext';
 
 const POLL_MS = 3000;
 const goBack = () => (router.canGoBack() ? router.back() : router.replace('/'));
 
-/** First sign-in for another user on this device: their password, or Quick Connect. */
+/**
+ * First sign-in for another user on this device (their password, or Quick
+ * Connect), or proving who you are to clear a forgotten profile PIN.
+ */
 export default function SwitchUser() {
-  const { name = '' } = useLocalSearchParams<{ userId: string; name: string }>();
-  const { jellyfin, server, signIn } = useAuthedSession();
+  const { userId, name = '', resetPin } = useLocalSearchParams<{ userId: string; name: string; resetPin?: string }>();
+  const { jellyfin, server, signIn, profileChosen } = useAuthedSession();
+  const [done, setDone] = useState(false);
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string>();
   const [busy, setBusy] = useState(false);
   const [quick, setQuick] = useState<QuickConnectSession | null>(null);
 
   const finish = async (auth: Parameters<typeof signIn>[0]) => {
+    // Signing in as them proves it's them: a forgotten PIN goes away.
+    if (resetPin && auth.userId === userId) await setPin(userId, null);
     await signIn(auth);
-    goBack();
+    setDone(true);
   };
+
+  // Signed in: once the rest of the app is unlocked, go home as them.
+  useEffect(() => {
+    if (done && profileChosen) goHome();
+  }, [done, profileChosen]);
 
   // Quick Connect in parallel: approving the code from their phone also works.
   useEffect(() => {
@@ -68,8 +81,12 @@ export default function SwitchUser() {
       <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: spacing.xxxl }}>
         <View style={{ flex: 2, gap: spacing.md }}>
           <Avatar name={name} size={72} />
-          <Text variant="headline">Switch to {name}</Text>
-          <Text tone="secondary">Enter {name}’s Jellyfin password, or leave it blank if they don’t have one. You’ll only need to do this once on this TV.</Text>
+          <Text variant="headline">{resetPin ? `Forgot ${name}’s PIN?` : `Switch to ${name}`}</Text>
+          <Text tone="secondary">
+            {resetPin
+              ? `Enter ${name}’s Jellyfin password to remove the PIN from this profile. You can set a new one in Settings.`
+              : `Enter ${name}’s Jellyfin password, or leave it blank if they don’t have one. You’ll only need to do this once on this TV.`}
+          </Text>
         </View>
         <View style={{ flex: 3, gap: spacing.lg }}>
           <TextField

@@ -20,8 +20,8 @@
       [
         "expo-splash-screen",
         {
-          "image": "./assets/images/icon-1920x720.png",
-          "imageWidth": 480,
+          "image": "./assets/images/splash-icon.png",
+          "imageWidth": 200,
           "backgroundColor": "#0B0D12"
         }
       ],
@@ -39,13 +39,18 @@
       "expo-image"
     ],
     "android": {
-      "package": "dev.chrisdmacrae.tvandj"
+      "package": "dev.chrisdmacrae.tvandj",
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/images/adaptive-icon.png",
+        "backgroundColor": "#0B0D12"
+      }
     },
     "ios": {
       "bundleIdentifier": "dev.chrisdmacrae.tvandj"
     },
     "name": "TV and J",
     "slug": "tv-and-j",
+    "icon": "./assets/images/icon.png",
     "userInterfaceStyle": "dark",
     "scheme": "tvandj"
   }

@@ -1,7 +1,9 @@
+import { router } from 'expo-router';
 import { ActivityIndicator, FlatList, View } from 'react-native';
-import { Shelf, Text, colors, safeArea, spacing } from '@tv-and-j/design-system';
+import { Button, Shelf, Text, colors, safeArea, spacing } from '@tv-and-j/design-system';
 import type { MediaKind } from '../downloadarr/client';
 import { useDiscoverGenre, useDiscoverGenres, useDownloadarr, usePopular, useRequestedItems } from '../downloadarr/hooks';
+import { useHasCollections } from '../jellyfin/browse';
 import { useLibraryByGenre, useLibraryGenres } from '../jellyfin/library';
 import { DiscoverCard } from './DiscoverCard';
 import { MediaCard } from './MediaCard';
@@ -37,7 +39,12 @@ function DiscoverBrowse({ kind }: { kind: MediaKind }) {
       initialNumToRender={3}
       windowSize={5}
       contentContainerStyle={{ paddingBottom: safeArea.vertical }}
-      ListHeaderComponent={<RequestedRow items={requested} autoFocus />}
+      ListHeaderComponent={
+        <>
+          <LibraryLinks kind={kind} />
+          <RequestedRow items={requested} autoFocus />
+        </>
+      }
       renderItem={({ item: row, index }) =>
         row.genreId == null ? (
           <PopularRow kind={kind} title={row.title} autoFocus={index === 0 && requested.length === 0} />
@@ -88,6 +95,7 @@ function LibraryBrowse({ kind }: { kind: MediaKind }) {
       initialNumToRender={3}
       windowSize={5}
       contentContainerStyle={{ paddingBottom: safeArea.vertical }}
+      ListHeaderComponent={<LibraryLinks kind={kind} />}
       renderItem={({ item: genre, index }) => <LibraryGenreRow kind={kind} genre={genre} autoFocus={index === 0} />}
     />
   );
@@ -105,6 +113,28 @@ function LibraryGenreRow({ kind, genre, autoFocus }: { kind: MediaKind; genre: s
         <MediaCard item={item} shape="portrait" hasTVPreferredFocus={autoFocus && index === 0} />
       )}
     />
+  );
+}
+
+/**
+ * The whole library as a sortable, filterable grid, plus collections and My
+ * List. Above the rows; Up from the first row reaches it.
+ */
+function LibraryLinks({ kind }: { kind: MediaKind }) {
+  const hasCollections = useHasCollections();
+  return (
+    <View style={{ flexDirection: 'row', gap: spacing.sm, paddingHorizontal: safeArea.horizontal, paddingBottom: spacing.lg }}>
+      <Button
+        label={kind === 'movie' ? 'All movies' : 'All shows'}
+        size="sm"
+        variant="secondary"
+        onPress={() => router.push({ pathname: '/library/[kind]', params: { kind: kind === 'movie' ? 'movies' : 'tv' } })}
+      />
+      {kind === 'movie' && hasCollections ? (
+        <Button label="Collections" size="sm" variant="secondary" onPress={() => router.push({ pathname: '/library/[kind]', params: { kind: 'collections' } })} />
+      ) : null}
+      <Button label="My List" size="sm" variant="secondary" onPress={() => router.push({ pathname: '/library/[kind]', params: { kind: 'mylist' } })} />
+    </View>
   );
 }
 
