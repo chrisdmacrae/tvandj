@@ -18,9 +18,3 @@ export const LANGUAGES: { value: Language; label: string }[] = [
   { value: 'spanish', label: 'Spanish' },
   { value: 'japanese', label: 'Japanese' },
 ];
-
-/** Normalise what someone typed into downloadarr's API address: kept as-is if it's already a full one, otherwise http://host:3001. */
-export function downloadarrAddress(input: string, normalize: (s: string) => string) {
-  const trimmed = input.trim();
-  return /^https?:\/\/.+(:\d+|\/api)$/.test(trimmed) ? trimmed : normalize(trimmed);
-}

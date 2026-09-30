@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react';
 import { View } from 'react-native';
 import { Button, TextField, spacing } from '@tv-and-j/design-system';
 import { Downloadarr, findDownloadarr, normalizeBaseUrl } from '@tv-and-j/core/downloadarr/client';
-import { downloadarrAddress } from '@tv-and-j/core/downloadarr/requestOptions';
 import { useAuthedSession } from '@tv-and-j/core/state/SessionContext';
 import { useSettings } from '@tv-and-j/core/state/SettingsContext';
 
@@ -37,7 +36,7 @@ export function DownloadarrAddress() {
 
   const connect = async () => {
     if (!address.trim()) return setMessage({ error: true, text: 'Enter downloadarr’s address.' });
-    const url = downloadarrAddress(address, normalizeBaseUrl);
+    const url = normalizeBaseUrl(address);
     if (servedSecurely && url.startsWith('http://')) {
       return setMessage({ error: true, text: 'This page is secure (https), so browsers won’t let it reach an http address. Use downloadarr’s https address.' });
     }
@@ -51,7 +50,7 @@ export function DownloadarrAddress() {
     } catch {
       setMessage({
         error: true,
-        text: 'Couldn’t reach downloadarr there. Use its API address (usually port 3001), and make sure downloadarr allows this app’s address (FRONTEND_URL).',
+        text: 'Couldn’t reach downloadarr there. Use its API address, including the port (usually 3001), and make sure downloadarr allows this app’s address (FRONTEND_URL).',
       });
     } finally {
       setBusy(false);

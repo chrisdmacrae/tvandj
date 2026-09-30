@@ -152,7 +152,7 @@ export default function SettingsScreen() {
 
   const connect = async () => {
     if (!address.trim()) return setCheck({ state: 'error', message: 'Enter downloadarr’s address.' });
-    const url = /^https?:\/\/.+(:\d+|\/api)$/.test(address.trim()) ? address.trim() : normalizeBaseUrl(address);
+    const url = normalizeBaseUrl(address);
     setCheck({ state: 'checking' });
     try {
       await new Downloadarr(url).ping();
@@ -162,7 +162,7 @@ export default function SettingsScreen() {
     } catch {
       setCheck({
         state: 'error',
-        message: 'Couldn’t reach downloadarr there. Use its API address, usually port 3001, e.g. 192.168.1.20:3001.',
+        message: 'Couldn’t reach downloadarr there. Use its API address, including the port, e.g. 192.168.1.20:3001.',
       });
     }
   };

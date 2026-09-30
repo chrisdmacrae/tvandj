@@ -230,9 +230,8 @@ const LANGUAGE: Record<Language, string> = {
 
 export function normalizeBaseUrl(input: string): string {
   let url = input.trim().replace(/\/+$/, '');
+  // The port is the user's to give: downloadarr may sit behind a proxy on 80/443.
   if (!/^https?:\/\//i.test(url)) url = `http://${url}`;
-  // A bare host means the API port; downloadarr's UI (3000) proxies it under /api.
-  if (!/:\d+/.test(url.replace(/^https?:\/\//i, '')) && !/\/api$/.test(url)) url = `${url}:3001`;
   return url;
 }
 
