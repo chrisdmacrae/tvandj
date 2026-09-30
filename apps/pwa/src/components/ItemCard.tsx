@@ -6,6 +6,7 @@ import { landscapeUrl, posterUrl } from '@tv-and-j/core/jellyfin/images';
 import { useSetGlow } from '@tv-and-j/core/state/GlowContext';
 import { useAuthedSession } from '@tv-and-j/core/state/SessionContext';
 import { itemGlow } from '../lib/glowColor';
+import { useMusic } from '../music/MusicPlayer';
 
 function subtitleFor(item: BaseItemDto, shape: ArtworkShape) {
   if (item.Type === 'Episode') {
@@ -21,12 +22,14 @@ function subtitleFor(item: BaseItemDto, shape: ArtworkShape) {
 }
 
 /** Where a card goes: albums to their track list, songs straight to playing, everything else to its page. */
-export function openItem(item: BaseItemDto) {
+function openItem(item: BaseItemDto, playSong: (song: BaseItemDto) => void) {
   if (!item.Id) return;
   if (item.Type === 'MusicAlbum') router.push({ pathname: '/album/[id]', params: { id: item.Id } });
   else if (item.Type === 'BoxSet') router.push({ pathname: '/collection/[id]', params: { id: item.Id } });
-  else if (item.Type === 'Audio') router.push({ pathname: '/watch/[id]', params: { id: item.Id } });
-  else router.push({ pathname: '/item/[id]', params: { id: item.Id } });
+  else if (item.Type === 'Audio') {
+    playSong(item);
+    router.push('/now-playing');
+  } else router.push({ pathname: '/item/[id]', params: { id: item.Id } });
 }
 
 /** A Jellyfin title as a card: artwork, progress, watched tick. */
@@ -36,6 +39,7 @@ export const ItemCard = memo(function ItemCard({ item, shape }: { item: BaseItem
   const played = item.UserData?.PlayedPercentage;
   const unplayed = item.Type === 'Series' ? item.UserData?.UnplayedItemCount : undefined;
   const setGlow = useSetGlow();
+  const { playQueue } = useMusic();
   // Keyboard focus or the mouse over it: either one lights the glow.
   const glow = () => setGlow(itemGlow(item, shape === 'landscape' ? ['Thumb', 'Primary', 'Backdrop'] : ['Primary']));
   return (
@@ -49,7 +53,7 @@ export const ItemCard = memo(function ItemCard({ item, shape }: { item: BaseItem
       watched={item.UserData?.Played && !played && item.Type !== 'Series'}
       onFocus={glow}
       onHoverIn={glow}
-      onPress={() => openItem(item)}
+      onPress={() => openItem(item, (song) => playQueue([song]))}
     />
   );
 });

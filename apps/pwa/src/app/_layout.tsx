@@ -7,12 +7,11 @@ import { DarkTheme, Stack, ThemeProvider } from 'expo-router';
 import { useEffect } from 'react';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { colors } from '@tv-and-j/design-system';
-import { PreviewProvider } from '@tv-and-j/core/state/PreviewPlayer';
 import { SessionProvider, useSession } from '@tv-and-j/core/state/SessionContext';
 import { SettingsProvider, useSettings } from '@tv-and-j/core/state/SettingsContext';
 import { useArrowKeyNavigation } from '../lib/keyboardNav';
-import { createPreviewAudio } from '../lib/previewAudio';
 import { RemoteTargetProvider } from '../lib/remoteTarget';
+import { MusicPlayerProvider } from '../music/MusicPlayer';
 
 const theme = {
   ...DarkTheme,
@@ -42,6 +41,7 @@ function RootStack() {
           <Stack.Screen name="item/[id]" />
           <Stack.Screen name="album/[id]" />
           <Stack.Screen name="watch/[id]" />
+          <Stack.Screen name="now-playing" />
           <Stack.Screen name="discover/[kind]/[tmdbId]" />
           <Stack.Screen name="discover/album" />
           <Stack.Screen name="library/[kind]" />
@@ -71,10 +71,10 @@ export default function RootLayout() {
           <SessionProvider>
             <SettingsProvider>
               <RemoteTargetProvider>
-                {/* Deezer previews and artist radio: one clip at a time, app-wide, so a station plays on while you browse. */}
-                <PreviewProvider createAudio={createPreviewAudio}>
+                {/* Always mounted, so music (and previews and radio) play on across screens; idle until a profile is chosen. */}
+                <MusicPlayerProvider>
                   <RootStack />
-                </PreviewProvider>
+                </MusicPlayerProvider>
               </RemoteTargetProvider>
             </SettingsProvider>
           </SessionProvider>

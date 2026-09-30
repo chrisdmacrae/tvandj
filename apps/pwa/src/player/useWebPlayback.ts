@@ -7,6 +7,7 @@ import { forwardsCredentials } from '@tv-and-j/core/network';
 import { usePreview } from '@tv-and-j/core/state/PreviewPlayer';
 import { useAuthedSession } from '@tv-and-j/core/state/SessionContext';
 import type { PlaybackControls } from '@tv-and-j/player/types';
+import { useMusic } from '../music/MusicPlayer';
 
 const PROGRESS_INTERVAL_MS = 10_000;
 const VOLUME_STEP = 0.1;
@@ -24,9 +25,11 @@ export function useWebPlayback(item: BaseItemDto | undefined, options: { startAt
 } {
   const { api, auth } = useAuthedSession();
   const queryClient = useQueryClient();
-  // A preview or radio station playing on would talk over this.
+  // A preview, radio station or song playing on would talk over this.
   const stopPreview = usePreview().stop;
   useEffect(() => stopPreview(), [stopPreview]);
+  const pauseMusic = useMusic().pause;
+  useEffect(() => pauseMusic(), [pauseMusic]);
   const [video, setVideo] = useState<HTMLVideoElement | null>(null);
   const [stream, setStream] = useState<Stream | null>(null);
   const [error, setError] = useState<string | null>(null);

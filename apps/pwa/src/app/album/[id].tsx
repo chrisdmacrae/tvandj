@@ -10,18 +10,20 @@ import { Page } from '../../components/Page';
 import { tuneIn } from '../../lib/radio';
 import { ScrobbleButton } from '../../components/ScrobbleButton';
 import { useDownloadarr } from '@tv-and-j/core/downloadarr/hooks';
+import { useMusic } from '../../music/MusicPlayer';
 
-/** An album: artwork, details, and its songs. Playing a song queues the rest of the album after it. */
+/** An album: artwork, details, and its songs. Playing a song queues the album from there, and it plays on as you browse. */
 export default function Album() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { api } = useAuthedSession();
   const { isPhone, gutter } = useLayout();
   const album = useItem(id).data;
   const tracks = useAlbumTracks(id).data ?? [];
-  const queue = tracks.map((t) => t.Id).filter(Boolean).join(',');
+  const music = useMusic();
   const play = (index: number) => {
-    const track = tracks[index];
-    if (track?.Id) router.push({ pathname: '/watch/[id]', params: { id: track.Id, queue } });
+    if (!tracks[index]?.Id) return;
+    music.playQueue(tracks, { startIndex: index });
+    router.push('/now-playing');
   };
   const art = album ? posterUrl(api, album, 600) : undefined;
   // downloadarr's artist radio: music like this that isn't in the library yet.
@@ -52,7 +54,11 @@ export default function Album() {
             // Scrobble sits beside the row, not in it: the row itself is a button (it plays).
             <View key={track.Id} style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs }}>
               <View style={{ flex: 1 }}>
-                <ListItem title={`${track.IndexNumber ?? i + 1}. ${track.Name ?? ''}`} trailing={trackLength(track.RunTimeTicks)} onPress={() => play(i)} />
+                <ListItem
+                  title={`${music.current?.Id === track.Id ? (music.isPlaying ? '♪ ' : '❙❙ ') : `${track.IndexNumber ?? i + 1}. `}${track.Name ?? ''}`}
+                  trailing={trackLength(track.RunTimeTicks)}
+                  onPress={() => play(i)}
+                />
               </View>
               <ScrobbleButton itemId={track.Id} itemType={track.Type} compact />
             </View>

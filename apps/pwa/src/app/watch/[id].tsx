@@ -19,15 +19,16 @@ function episodeLine(item: { Type?: string | null; ParentIndexNumber?: number | 
 }
 
 /**
- * Plays a title (or a song) with the same player as the TV: its controls,
- * scrubbing, audio & subtitles, Skip intro and the next-episode card, driven
- * by touch, mouse or keyboard. At the end: the next song in the queue, the
- * next episode (if this profile autoplays), or back.
+ * Plays a title with the same player as the TV: its controls, scrubbing,
+ * audio & subtitles, Skip intro and the next-episode card, driven by touch,
+ * mouse or keyboard. At the end: the next episode (if this profile autoplays),
+ * or back. Songs go to the music player instead (Now Playing), which plays on
+ * while you browse.
  *
- * start: begin here (seconds) instead of the resume point. queue: song ids to play in order.
+ * start: begin here (seconds) instead of the resume point.
  */
 export default function Watch() {
-  const { id, start, queue } = useLocalSearchParams<{ id: string; start?: string; queue?: string }>();
+  const { id, start } = useLocalSearchParams<{ id: string; start?: string }>();
   const { api } = useAuthedSession();
   const { settings } = useSettings();
   const focused = useIsFocused();
@@ -36,14 +37,11 @@ export default function Watch() {
   const nextEpisode = useNextEpisode(item).data ?? null;
   const upNextDismissed = useRef(false);
 
-  const ids = queue ? queue.split(',') : [];
-  const nextInQueue = ids[ids.indexOf(id) + 1];
   const playNext = useCallback(() => {
     if (nextEpisode?.Id) router.replace({ pathname: '/watch/[id]', params: { id: nextEpisode.Id } });
   }, [nextEpisode]);
   const onEnd = () => {
-    if (nextInQueue) router.replace({ pathname: '/watch/[id]', params: { id: nextInQueue, queue } });
-    else if (nextEpisode && settings.playback.autoplayNext && !upNextDismissed.current) playNext();
+    if (nextEpisode && settings.playback.autoplayNext && !upNextDismissed.current) playNext();
     else goBack();
   };
 

@@ -24,10 +24,12 @@ import { useAuthedSession } from '@tv-and-j/core/state/SessionContext';
 import { useSettings } from '@tv-and-j/core/state/SettingsContext';
 import { CastButton } from '../../components/CastButton';
 import { FocusGlow } from '../../components/FocusGlow';
+import { MINI_PLAYER, MiniPlayer, NowPlayingButton } from '../../components/MiniPlayer';
 import { OnAirButton } from '../../components/OnAirButton';
 import { RemoteBar } from '../../components/RemoteBar';
 import { BottomSpaceContext } from '../../lib/chrome';
 import { useRemoteTarget } from '../../lib/remoteTarget';
+import { useMusic } from '../../music/MusicPlayer';
 
 type Tab = { key: '/' | '/movies' | '/tv' | '/music' | '/search'; label: string; icon: (color: string) => React.ReactNode };
 
@@ -83,9 +85,12 @@ function TabsChrome() {
   const go = (key: string) => key !== selected && router.replace(key as Tab['key']);
   const remoteSpace = useRemoteTarget().sessionId ? REMOTE_BAR : 0;
   const onAir = !!useOnAirRadio();
+  const musicSpace = useMusic().current ? MINI_PLAYER : 0;
 
   if (isPhone) {
-    const bottomSpace = BOTTOM_NAV + insets.bottom + remoteSpace + (onAir ? ON_AIR : 0);
+    // Stacked up from the bottom navigation: the song that's on, the screen being controlled, the radio.
+    const navTop = BOTTOM_NAV + insets.bottom;
+    const bottomSpace = navTop + musicSpace + remoteSpace + (onAir ? ON_AIR : 0);
     return (
       <View style={{ flex: 1, backgroundColor: colors.canvas }}>
         <FocusGlow />
@@ -94,9 +99,10 @@ function TabsChrome() {
             <Slot />
           </View>
         </BottomSpaceContext>
-        <RemoteBar bottom={BOTTOM_NAV + insets.bottom} />
+        <MiniPlayer bottom={navTop} />
+        <RemoteBar bottom={navTop + musicSpace} />
         {onAir ? (
-          <View style={{ position: 'absolute', right: spacing.md, bottom: BOTTOM_NAV + insets.bottom + remoteSpace + spacing.sm }}>
+          <View style={{ position: 'absolute', right: spacing.md, bottom: navTop + musicSpace + remoteSpace + spacing.sm }}>
             <OnAirButton variant="secondary" />
           </View>
         ) : null}
@@ -116,6 +122,7 @@ function TabsChrome() {
         onSelect={go}
         trailing={
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
+            <NowPlayingButton />
             <OnAirButton />
             <CastButton />
             <IconButton accessibilityLabel="Search" selected={selected === '/search'} icon={(c) => <SearchIcon color={c} />} onPress={() => go('/search')} />

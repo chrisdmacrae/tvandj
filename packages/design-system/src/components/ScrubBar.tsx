@@ -60,9 +60,17 @@ export function ScrubBar({ value, playing, label, preview, onSeek, onPress, ...r
   const width = useRef(0);
   const press = (e: GestureResponderEvent) => {
     // A pointer press lands somewhere on the bar (keyboard and D-pad presses don't): seek there.
-    const x = e.nativeEvent?.locationX;
-    if (onSeek && typeof x === 'number' && width.current > 0 && (e.nativeEvent as { pageX?: number }).pageX) {
-      onSeek(Math.min(1, Math.max(0, x / width.current)));
+    // Native touches carry locationX; on the web onPress gets the click's MouseEvent, measured against the bar.
+    const pointer = e.nativeEvent as { locationX?: number; pageX?: number; clientX?: number };
+    let x = pointer.locationX;
+    let barWidth = width.current;
+    const rect = (e.currentTarget as unknown as { getBoundingClientRect?: () => DOMRect } | null)?.getBoundingClientRect?.();
+    if (typeof x !== 'number' && rect && typeof pointer.clientX === 'number') {
+      x = pointer.clientX - rect.left;
+      barWidth = rect.width;
+    }
+    if (onSeek && typeof x === 'number' && barWidth > 0 && pointer.pageX) {
+      onSeek(Math.min(1, Math.max(0, x / barWidth)));
     } else {
       onPress?.(e);
     }
