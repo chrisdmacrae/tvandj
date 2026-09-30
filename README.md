@@ -11,6 +11,25 @@ Amazon's [Get Started with React Native for Fire TV](https://developer.amazon.co
 | `@tv-and-j/tv` — the Fire TV / Android TV app | `apps/tv` |
 | `@tv-and-j/design-system` — tokens, RN components, Claude Design previews | `packages/design-system` |
 
+## Install on a Fire TV or Android TV
+
+Turn on ADB debugging on the TV (Fire TV: **Settings → My Fire TV → Developer options**; Android TV:
+**Settings → Device Preferences → Developer options**), connect to it, then install the latest release
+in one line:
+
+```sh
+adb connect 192.168.1.50:5555   # your TV's IP address; accept the prompt on the TV
+```
+
+```sh
+url=$(curl -fsSL https://api.github.com/repos/chrisdmacrae/tvandj/releases | grep -o 'https://[^"]*/tv-and-j-[^"]*\.apk' | head -1) && curl -fL "${url:?No TV and J release yet}" -o /tmp/tv-and-j.apk && adb install -r /tmp/tv-and-j.apk
+```
+
+It picks the newest release with an APK attached (the repository's releases also include the Jellyfin
+plugin's, so GitHub's "latest" link isn't the app), downloads it and installs it. Run it again to update:
+`-r` keeps your sign-in and settings. With more than one device connected, add `-s 192.168.1.50:5555`
+after `adb`. Releases come from pushing a `tv-v<version>` tag (see `.github/workflows/android-apk.yml`).
+
 ## Getting started
 
 Requires Node 20+, a JDK 17, and the Android SDK (`ANDROID_HOME`) for native builds.
