@@ -198,7 +198,8 @@ export function useSeasons(seriesId: string | undefined) {
     queryKey: ['seasons', seriesId, auth.userId],
     enabled: !!seriesId,
     queryFn: async () => {
-      const { data } = await getShowApi(api).getSeasons({ seriesId: seriesId!, userId: auth.userId });
+      // CanDelete: whether this user may delete a season (shown to admins with deletion rights).
+      const { data } = await getShowApi(api).getSeasons({ seriesId: seriesId!, userId: auth.userId, fields: ['CanDelete'] });
       return data.Items ?? [];
     },
   });

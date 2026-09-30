@@ -8,7 +8,9 @@ import Svg, { Defs, LinearGradient, Rect, Stop } from 'react-native-svg';
 import { ArrowLeftIcon, Button, Chip, DownloadBar, IconButton, Shelf, Text, colors, safeArea, spacing } from '@tv-and-j/design-system';
 import { backdropUrl, logoUrl, posterUrl } from '../../jellyfin/images';
 import { downloadDisplay } from '../../components/DiscoverCard';
+import { DeleteButton } from '../../components/DeleteButton';
 import { FittedText } from '../../components/FittedText';
+import { useMusic } from '../../music/MusicPlayer';
 import { MediaCard } from '../../components/MediaCard';
 import { JellyfinPersonCard } from '../../components/PersonCard';
 import { SeasonBrowser } from '../../components/SeasonBrowser';
@@ -188,6 +190,13 @@ export default function ItemScreen() {
     const timer = setTimeout(() => setPhase('preview'), art ? ART_HOLD_MS : 0);
     return () => clearTimeout(timer);
   }, [ready, phase, art, autoplay]);
+
+  // A video starting (preview or full) stops any music, which would otherwise play over it.
+  const stopMusic = useMusic().stop;
+  const musicPlaying = !!useMusic().current;
+  useEffect(() => {
+    if ((phase === 'preview' || phase === 'player') && musicPlaying) stopMusic();
+  }, [phase, musicPlaying, stopMusic]);
 
   useEffect(() => {
     if (phase !== 'preview') return;
@@ -513,6 +522,7 @@ export default function ItemScreen() {
                     onPress={() => item.Id && !togglePlayed.isPending && togglePlayed.mutate({ itemId: item.Id, on: !watched })}
                   />
                 ) : null}
+                <DeleteButton item={item} label="Delete" onFocus={scrollToTop} onDeleted={() => (router.canGoBack() ? router.back() : router.replace('/'))} />
               </View>
             ) : null}
           </View>

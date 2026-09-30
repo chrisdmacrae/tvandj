@@ -6,6 +6,7 @@ import { useActiveDownload } from '../downloadarr/hooks';
 import { landscapeUrl, posterUrl } from '../jellyfin/images';
 import { itemGlow } from '../lib/glowColor';
 import { useSetGlow } from '../state/GlowContext';
+import { useMusic } from '../music/MusicPlayer';
 import { useAuthedSession } from '../state/SessionContext';
 import { downloadDisplay } from './DiscoverCard';
 
@@ -18,6 +19,9 @@ function episodeLabel(item: BaseItemDto) {
 function subtitleFor(item: BaseItemDto, shape: ArtworkShape) {
   if (item.Type === 'Episode') return [episodeLabel(item), item.Name].filter(Boolean).join(' · ');
   if (item.Type === 'MusicAlbum') return item.AlbumArtist ?? item.Artists?.[0] ?? undefined;
+  if (item.Type === 'Audio') return item.Artists?.[0] ?? item.AlbumArtist ?? undefined;
+  if (item.Type === 'Playlist') return item.ChildCount ? `${item.ChildCount} songs` : undefined;
+  if (item.Type === 'MusicArtist') return undefined;
   if (shape === 'landscape' && item.RunTimeTicks && item.UserData?.PlaybackPositionTicks) {
     const left = Math.round((item.RunTimeTicks - item.UserData.PlaybackPositionTicks) / 600_000_000);
     return `${left}m left`;
@@ -42,6 +46,7 @@ export const MediaCard = memo(function MediaCard({ item, shape, hasTVPreferredFo
   const tmdbId = item.Type === 'Series' || item.Type === 'Movie' ? (item.ProviderIds?.Tmdb ?? undefined) : undefined;
   const download = downloadDisplay(useActiveDownload(kind, tmdbId));
   const setGlow = useSetGlow();
+  const music = useMusic();
 
   return (
     <PosterCard
@@ -61,9 +66,15 @@ export const MediaCard = memo(function MediaCard({ item, shape, hasTVPreferredFo
       }}
       onPress={() => {
         if (!item.Id) return;
-        // A collection (box set) opens as a grid of its titles.
+        // Each kind of thing has its own page; a song just plays.
         if (item.Type === 'BoxSet') router.push({ pathname: '/collection/[id]', params: { id: item.Id } });
-        else router.push({ pathname: '/item/[id]', params: { id: item.Id } });
+        else if (item.Type === 'MusicAlbum') router.push({ pathname: '/album/[id]', params: { id: item.Id } });
+        else if (item.Type === 'MusicArtist') router.push({ pathname: '/artist/[id]', params: { id: item.Id } });
+        else if (item.Type === 'Playlist') router.push({ pathname: '/playlist/[id]', params: { id: item.Id } });
+        else if (item.Type === 'Audio') {
+          music.playQueue([item]);
+          router.push('/now-playing');
+        } else router.push({ pathname: '/item/[id]', params: { id: item.Id } });
       }}
     />
   );

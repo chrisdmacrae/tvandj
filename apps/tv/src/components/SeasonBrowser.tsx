@@ -7,6 +7,7 @@ import { useRequestSeasons } from '../downloadarr/hooks';
 import { seasonProgress, type TvProgress } from '../downloadarr/tvStatus';
 import { landscapeUrl } from '../jellyfin/images';
 import { useTogglePlayed } from '../jellyfin/browse';
+import { DeleteButton } from './DeleteButton';
 import { useEpisodes, useSeasons } from '../jellyfin/library';
 import { useAuthedSession } from '../state/SessionContext';
 
@@ -147,6 +148,7 @@ export function SeasonBrowser({ series, tmdbId, initialSeason, onPlayEpisode, on
             onPress={() => season.jellyfin?.Id && !togglePlayed.isPending && togglePlayed.mutate({ itemId: season.jellyfin.Id, on: !seasonWatched })}
           />
         ) : null}
+        <DeleteButton item={season?.jellyfin} label="Delete season" onFocus={onFocus} onDeleted={() => setSelected(undefined)} />
       </FocusGuide>
       <FocusGuide autoFocus style={{ width: '100%' }}>
         <FlatList

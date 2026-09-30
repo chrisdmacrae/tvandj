@@ -8,13 +8,17 @@ import { GlowScreen } from '../../components/GlowScreen';
 import { PageHeader } from '../../components/PageHeader';
 import { GRID_SORTS, useItemGrid, type GridSort } from '../../jellyfin/browse';
 import { useLibraryGenres } from '../../jellyfin/library';
+import { useAlbumArtists } from '../../jellyfin/music';
 
-type Kind = 'movies' | 'tv' | 'collections' | 'mylist';
+type Kind = 'movies' | 'tv' | 'collections' | 'mylist' | 'albums' | 'artists';
 
 const KINDS: Record<Kind, { title: string; types: BaseItemKind[]; sort: GridSort; filters: boolean; empty: string }> = {
   movies: { title: 'All movies', types: ['Movie'], sort: 'added', filters: true, empty: 'No movies match.' },
   tv: { title: 'All shows', types: ['Series'], sort: 'added', filters: true, empty: 'No shows match.' },
   collections: { title: 'Collections', types: ['BoxSet'], sort: 'name', filters: false, empty: 'No collections yet.' },
+  albums: { title: 'All albums', types: ['MusicAlbum'], sort: 'name', filters: false, empty: 'No albums yet.' },
+  // Artists come from Jellyfin's album-artist list, not an item query (see below).
+  artists: { title: 'All artists', types: ['MusicArtist'], sort: 'name', filters: false, empty: 'No artists yet.' },
   mylist: {
     title: 'My List',
     types: ['Movie', 'Series'],
@@ -36,15 +40,22 @@ export default function LibraryGrid() {
   const [genre, setGenre] = useState('');
   const genres = useLibraryGenres(kind === 'tv' ? 'tv' : 'movie').data ?? [];
 
-  const grid = useItemGrid({
-    types: config.types,
-    sort,
-    unwatched: config.filters && unwatched,
-    uhd: config.filters && uhd,
-    genre: config.filters ? genre || undefined : undefined,
-    favorites: kind === 'mylist',
-  });
+  const isArtists = kind === 'artists';
+  const itemGrid = useItemGrid(
+    {
+      types: config.types,
+      sort,
+      unwatched: config.filters && unwatched,
+      uhd: config.filters && uhd,
+      genre: config.filters ? genre || undefined : undefined,
+      favorites: kind === 'mylist',
+    },
+    !isArtists,
+  );
+  const artistGrid = useAlbumArtists(undefined, isArtists);
+  const grid = isArtists ? artistGrid : itemGrid;
   const items = grid.data?.pages.flatMap((p) => p.items) ?? [];
+  const music = kind === 'albums' || isArtists;
 
   return (
     <GlowScreen>
@@ -54,10 +65,11 @@ export default function LibraryGrid() {
         loadingMore={grid.isFetchingNextPage}
         onEndReached={() => grid.hasNextPage && !grid.isFetchingNextPage && grid.fetchNextPage()}
         empty={config.empty}
+        shape={music ? 'square' : 'portrait'}
         autoFocus
         header={
           <PageHeader title={config.title}>
-            {kind === 'collections' ? null : (
+            {kind === 'collections' || isArtists ? null : (
               <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: spacing.sm }}>
                 <Dropdown label="Sort" value={sort} options={GRID_SORTS} onChange={setSort} />
                 {config.filters ? (

@@ -230,6 +230,8 @@ body {
 }
 .ds-icon-button svg { width: 20px; height: 20px; }
 .ds-icon-button.is-focused { background: var(--color-text-primary); color: var(--color-text-inverse); transform: scale(1.1); }
+/* Selected: a toggle that's on (shuffle, repeat) */
+.ds-icon-button.is-selected { background: var(--color-accent); color: var(--color-text-inverse); }
 
 /* DownloadBar — something still arriving: "live" highlight colour plus a moving shimmer.
    Omit the width (.is-indeterminate) while searching or waiting to be indexed. */

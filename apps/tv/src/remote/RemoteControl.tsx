@@ -1,9 +1,10 @@
-import type { GeneralCommandType } from '@jellyfin/sdk/lib/generated-client/models';
-import { getSessionApi } from '@jellyfin/sdk/lib/utils/api';
+import type { BaseItemDto, GeneralCommandType } from '@jellyfin/sdk/lib/generated-client/models';
+import { getLibraryApi, getSessionApi } from '@jellyfin/sdk/lib/utils/api';
 import { router } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import { View } from 'react-native';
 import { Text, colors, radii, safeArea, spacing } from '@tv-and-j/design-system';
+import { useMusic } from '../music/MusicPlayer';
 import { useAuthedSession } from '../state/SessionContext';
 
 const TICKS_PER_SECOND = 10_000_000;
@@ -83,7 +84,10 @@ type Toast = { header?: string; text: string };
  * the playback reports the player already sends.
  */
 export function RemoteControl() {
-  const { api } = useAuthedSession();
+  const { api, auth } = useAuthedSession();
+  const music = useMusic();
+  const playMusic = useRef((items: BaseItemDto[], startIndex: number) => music.playQueue(items, { startIndex }));
+  playMusic.current = (items, startIndex) => music.playQueue(items, { startIndex });
   const [toast, setToast] = useState<Toast | null>(null);
   const toastTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
 
@@ -108,10 +112,24 @@ export function RemoteControl() {
         }
         case 'Play': {
           const ids: string[] = data.ItemIds ?? [];
-          const id = ids[data.StartIndex ?? 0] ?? ids[0];
+          const startIndex: number = data.StartIndex ?? 0;
+          const id = ids[startIndex] ?? ids[0];
           if (!id) break;
           const start = data.StartPositionTicks ? String(data.StartPositionTicks / TICKS_PER_SECOND) : undefined;
-          router.push({ pathname: '/item/[id]', params: { id, autoplay: '1', ...(start ? { start } : {}) } });
+          // Songs go to the music queue (in the order sent); anything else opens its page and plays.
+          getLibraryApi(api)
+            .getItems({ userId: auth.userId, ids })
+            .then(({ data: result }) => {
+              const items = result.Items ?? [];
+              if (items.length && items.every((i) => i.MediaType === 'Audio')) {
+                const ordered = ids.map((i) => items.find((item) => item.Id === i)).filter((i): i is BaseItemDto => !!i);
+                playMusic.current(ordered, startIndex);
+                router.push('/now-playing');
+              } else {
+                router.push({ pathname: '/item/[id]', params: { id, autoplay: '1', ...(start ? { start } : {}) } });
+              }
+            })
+            .catch(() => router.push({ pathname: '/item/[id]', params: { id, autoplay: '1', ...(start ? { start } : {}) } }));
           break;
         }
         case 'Playstate': {
@@ -228,7 +246,7 @@ export function RemoteControl() {
       clearInterval(keepAlive);
       socket?.close();
     };
-  }, [api]);
+  }, [api, auth.userId]);
 
   useEffect(() => () => clearTimeout(toastTimer.current), []);
 

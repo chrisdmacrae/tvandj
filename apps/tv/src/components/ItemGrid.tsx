@@ -56,15 +56,17 @@ export function CardGrid<T>({ items, keyExtractor, renderCard, loading, onEndRea
 type ItemGridProps = Omit<CardGridProps<BaseItemDto>, 'keyExtractor' | 'renderCard'> & {
   /** Put initial focus on the first card. */
   autoFocus?: boolean;
+  /** Square for music. */
+  shape?: 'portrait' | 'square';
 };
 
 /** Jellyfin titles as a poster grid. */
-export function ItemGrid({ autoFocus, ...rest }: ItemGridProps) {
+export function ItemGrid({ autoFocus, shape = 'portrait', ...rest }: ItemGridProps) {
   return (
     <CardGrid
       {...rest}
       keyExtractor={(item) => item.Id ?? ''}
-      renderCard={(item, index) => <MediaCard item={item} shape="portrait" hasTVPreferredFocus={autoFocus && index === 0} />}
+      renderCard={(item, index) => <MediaCard item={item} shape={shape} hasTVPreferredFocus={autoFocus && index === 0} />}
     />
   );
 }

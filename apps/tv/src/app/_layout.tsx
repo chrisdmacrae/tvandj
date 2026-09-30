@@ -9,6 +9,7 @@ import { rememberDeepLink } from '../lib/navigation';
 import { colors } from '@tv-and-j/design-system';
 import { AndroidTvHome } from '../components/AndroidTvHome';
 import { Screensaver } from '../components/Screensaver';
+import { MusicPlayerProvider } from '../music/MusicPlayer';
 import { RemoteControl } from '../remote/RemoteControl';
 import { SessionProvider, useSession } from '../state/SessionContext';
 import { SettingsProvider } from '../state/SettingsContext';
@@ -57,6 +58,10 @@ function RootStack() {
             <Stack.Screen name="collection/[id]" options={{ animation: 'fade' }} />
             <Stack.Screen name="person/[id]" options={{ animation: 'fade' }} />
             <Stack.Screen name="people/[tmdbId]" options={{ animation: 'fade' }} />
+          <Stack.Screen name="album/[id]" options={{ animation: 'fade' }} />
+          <Stack.Screen name="artist/[id]" options={{ animation: 'fade' }} />
+          <Stack.Screen name="playlist/[id]" options={{ animation: 'fade' }} />
+          <Stack.Screen name="now-playing" options={{ animation: 'fade' }} />
           </Stack.Protected>
         </Stack.Protected>
       </Stack>
@@ -77,8 +82,11 @@ export default function RootLayout() {
       <QueryClientProvider client={queryClient}>
         <SessionProvider>
           <SettingsProvider>
-            <StatusBar hidden />
-            <RootStack />
+            {/* Always mounted, so music plays on across screens; idle until a profile is chosen. */}
+            <MusicPlayerProvider>
+              <StatusBar hidden />
+              <RootStack />
+            </MusicPlayerProvider>
           </SettingsProvider>
         </SessionProvider>
       </QueryClientProvider>

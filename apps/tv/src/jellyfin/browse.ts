@@ -37,11 +37,12 @@ export type GridQuery = {
 };
 
 /** Paged library items for the full-library grids. */
-export function useItemGrid(query: GridQuery) {
+export function useItemGrid(query: GridQuery, enabled = true) {
   const { api, auth } = useAuthedSession();
   const { sortBy, sortOrder } = SORTS[query.sort ?? 'added'];
   return useInfiniteQuery({
     queryKey: ['grid', auth.userId, query],
+    enabled,
     initialPageParam: 0,
     queryFn: async ({ pageParam }) => {
       const { data } = await getLibraryApi(api).getItems({
