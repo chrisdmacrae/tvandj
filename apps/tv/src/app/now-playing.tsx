@@ -24,8 +24,8 @@ import {
 import { posterUrl } from '@tv-and-j/core/jellyfin/images';
 import { trackLength, useLyrics, type LyricLine } from '@tv-and-j/core/jellyfin/music';
 import { useMusic, useMusicProgress } from '../music/MusicPlayer';
-import { formatTime } from '../player/PlayerControls';
-import { useRemoteKeys } from '../player/useRemoteKeys';
+import { formatTime } from '@tv-and-j/player/PlayerControls';
+import { useRemoteKeys } from '@tv-and-j/player/useRemoteKeys';
 import { useAuthedSession } from '@tv-and-j/core/state/SessionContext';
 
 const ART = 220;

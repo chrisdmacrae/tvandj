@@ -8,7 +8,7 @@ import { Animated, Modal, Platform, Pressable, View } from 'react-native';
 import Svg, { Defs, LinearGradient, Rect, Stop } from 'react-native-svg';
 import { Text, colors, safeArea, spacing } from '@tv-and-j/design-system';
 import { backdropUrl, logoUrl } from '@tv-and-j/core/jellyfin/images';
-import { useRemoteKeys } from '../player/useRemoteKeys';
+import { useRemoteKeys } from '@tv-and-j/player/useRemoteKeys';
 import { useAuthedSession } from '@tv-and-j/core/state/SessionContext';
 import { useSettings } from '@tv-and-j/core/state/SettingsContext';
 

@@ -9,7 +9,11 @@ import { backdropUrl, logoUrl, personImageUrl } from '@tv-and-j/core/jellyfin/im
 import { useItem, usePlayQueue } from '@tv-and-j/core/jellyfin/library';
 import { useRatings } from '@tv-and-j/core/jellyfin/ratings';
 import { useAuthedSession } from '@tv-and-j/core/state/SessionContext';
+import { useState } from 'react';
+import { playOn, useRemoteDevices, type RemoteDevice } from '@tv-and-j/core/jellyfin/remote';
+import { DevicePicker } from '../../components/DevicePicker';
 import { Episodes } from '../../components/Episodes';
+import { useRemoteTarget } from '../../lib/remoteTarget';
 import { ItemCard } from '../../components/ItemCard';
 import { goBack } from '../../lib/nav';
 
@@ -44,6 +48,11 @@ export default function ItemPage() {
   const ratings = useRatings(item);
   const toggleFavorite = useToggleFavorite();
   const togglePlayed = useTogglePlayed();
+  // Play on another screen (the TV) through Jellyfin.
+  const remoteDevices = useRemoteDevices().data ?? [];
+  const { sessionId: castId, setSessionId } = useRemoteTarget();
+  const castTarget = remoteDevices.find((d) => d.Id === castId);
+  const [picking, setPicking] = useState(false);
 
   if (!item) {
     return (
@@ -59,6 +68,13 @@ export default function ItemPage() {
   const resumeAt = (target?.UserData?.PlaybackPositionTicks ?? 0) / TICKS_PER_SECOND;
   const play = (fromStart = false) =>
     target?.Id && router.push({ pathname: '/watch/[id]', params: { id: target.Id, ...(fromStart ? { start: '0' } : {}) } });
+  // Start it on the TV (at its resume point, as there), then open that screen's remote.
+  const playOnDevice = async (device: RemoteDevice) => {
+    if (!target?.Id) return;
+    setSessionId(device.Id);
+    await playOn(api, device.Id, [target.Id]).catch(() => {});
+    router.push({ pathname: '/remote/[id]', params: { id: device.Id } });
+  };
   const title = item.Type === 'Episode' ? (item.SeriesName ?? item.Name ?? '') : (item.Name ?? '');
   const logo = logoUrl(api, item);
   const art = backdropUrl(api, item, isPhone ? 1080 : 1920);
@@ -93,6 +109,17 @@ export default function ItemPage() {
           <Button label={resumeAt > 0 ? `Resume ${clock(resumeAt)}` : 'Play'} size="lg" disabled={!target} onPress={() => play()} />
           {resumeAt > 0 ? <Button label="Start over" size="lg" variant="secondary" onPress={() => play(true)} /> : null}
         </View>
+        {remoteDevices.length ? (
+          <View style={{ alignItems: 'flex-start' }}>
+            <Button
+              label={castTarget ? `Play on ${castTarget.DeviceName}` : 'Play on another screen'}
+              size="sm"
+              variant="secondary"
+              disabled={!target}
+              onPress={() => (castTarget ? playOnDevice(castTarget) : setPicking(true))}
+            />
+          </View>
+        ) : null}
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm }}>
           {item.Type === 'Movie' || isSeries ? (
             <Button label={inList ? '✓ My List' : '+ My List'} size="sm" variant="ghost" onPress={() => item.Id && toggleFavorite.mutate({ itemId: item.Id, on: !inList })} />
@@ -174,6 +201,16 @@ export default function ItemPage() {
       <View style={{ position: 'absolute', top: insets.top + spacing.md, left: gutter }}>
         <IconButton accessibilityLabel="Back" icon={(color) => <ArrowLeftIcon color={color} />} onPress={goBack} />
       </View>
+
+      <DevicePicker
+        visible={picking}
+        title="Play on…"
+        onClose={() => setPicking(false)}
+        onPick={(device) => {
+          setPicking(false);
+          playOnDevice(device);
+        }}
+      />
     </View>
   );
 }

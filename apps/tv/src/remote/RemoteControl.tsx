@@ -207,7 +207,7 @@ export function RemoteControl() {
 
     const connect = () => {
       if (closed) return;
-      const url = `${api.basePath.replace(/^http/, 'ws')}/socket?api_key=${encodeURIComponent(api.accessToken)}&deviceId=${encodeURIComponent(api.deviceInfo.id)}`;
+      const url = `${api.basePath.replace(/^http/, 'ws')}/socket?ApiKey=${encodeURIComponent(api.accessToken)}&deviceId=${encodeURIComponent(api.deviceInfo.id)}`;
       socket = new WebSocket(url);
       socket.onopen = () => {
         delay = RECONNECT_MIN_MS;

@@ -1,10 +1,11 @@
 import { useState, type ReactNode } from 'react';
 import { TVFocusGuideView, View } from 'react-native';
 import Svg, { Defs, LinearGradient, Rect, Stop } from 'react-native-svg';
-import { ArrowLeftIcon, Button, IconButton, ScrubBar, Text, colors, safeArea, spacing } from '@tv-and-j/design-system';
+import { ArrowLeftIcon, Button, IconButton, ScrubBar, Text, colors, spacing } from '@tv-and-j/design-system';
+import { usePlayerEdges, type Insets } from './edges';
 import { TracksPanel } from './TracksPanel';
 import { TrickplayPreview } from './TrickplayPreview';
-import type { Playback } from './usePlayback';
+import type { PlaybackControls as Playback } from './types';
 import { useRemoteKeys } from './useRemoteKeys';
 import type { Scrubber } from './useScrubber';
 
@@ -34,6 +35,8 @@ type PlayerControlsProps = {
   /** The audio & subtitles panel is open (it replaces the transport controls). */
   tracksOpen: boolean;
   onOpenTracks: () => void;
+  /** The device's notch and home bar (web and phones). */
+  insets?: Insets;
 };
 
 /**
@@ -41,7 +44,8 @@ type PlayerControlsProps = {
  * buttons can't steal D-pad focus. The timeline takes focus each time they
  * show: OK plays/pauses, Left/Right drive a continuous scrub.
  */
-export function PlayerControls({ playback, scrubber, title, subtitle, onInteract, onBack, action, tracksOpen, onOpenTracks }: PlayerControlsProps) {
+export function PlayerControls({ playback, scrubber, title, subtitle, onInteract, onBack, action, tracksOpen, onOpenTracks, insets }: PlayerControlsProps) {
+  const edges = usePlayerEdges(insets);
   const { currentTime, duration, isPlaying, volume, stream } = playback;
   const [scrubFocused, setScrubFocused] = useState(false);
 
@@ -74,7 +78,7 @@ export function PlayerControls({ playback, scrubber, title, subtitle, onInteract
           </Defs>
           <Rect x="0" y="0" width="100%" height="100%" fill="url(#controls-top-scrim)" />
         </Svg>
-        <View style={{ paddingHorizontal: safeArea.horizontal, paddingTop: safeArea.vertical, paddingBottom: spacing.xxxl, alignItems: 'flex-start' }}>
+        <View style={{ paddingHorizontal: edges.horizontal, paddingTop: edges.top, paddingBottom: spacing.xxxl, alignItems: 'flex-start' }}>
           <IconButton accessibilityLabel="Back" icon={(color) => <ArrowLeftIcon color={color} />} onPress={onBack} />
         </View>
       </View>
@@ -91,6 +95,7 @@ export function PlayerControls({ playback, scrubber, title, subtitle, onInteract
             playback.selectSubtitle(index);
             onInteract();
           }}
+          insets={insets}
         />
       ) : null}
 
@@ -107,7 +112,7 @@ export function PlayerControls({ playback, scrubber, title, subtitle, onInteract
           <Rect x="0" y="0" width="100%" height="100%" fill="url(#controls-scrim)" />
         </Svg>
 
-        <View style={{ paddingHorizontal: safeArea.horizontal, paddingTop: spacing.xxxl, paddingBottom: safeArea.vertical, gap: spacing.sm }}>
+        <View style={{ paddingHorizontal: edges.horizontal, paddingTop: spacing.xxxl, paddingBottom: edges.bottom, gap: spacing.sm }}>
           <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: spacing.lg }}>
             <View style={{ flex: 1 }}>
               <Text variant="title" numberOfLines={1}>
@@ -147,6 +152,15 @@ export function PlayerControls({ playback, scrubber, title, subtitle, onInteract
                 }}
                 // OK: finish a scrub (resuming if it was playing), otherwise play/pause.
                 onPress={act(() => (scrubber.scrubbing ? scrubber.commit() : playback.togglePlay()))}
+                // Touch and mouse: tap or click the bar to jump there. (On TV, OK plays/pauses.)
+                onSeek={
+                  edges.isTv || !duration
+                    ? undefined
+                    : (fraction) => {
+                        playback.seekTo(fraction * duration);
+                        onInteract();
+                      }
+                }
               />
             </FocusGuide>
             <Text variant="caption" tone="secondary" style={{ minWidth: 56, textAlign: 'right' }}>
@@ -156,11 +170,16 @@ export function PlayerControls({ playback, scrubber, title, subtitle, onInteract
 
           <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.sm }}>
             {hasTrackChoice ? <Button size="sm" variant="ghost" label={tracksLabel} onPress={act(onOpenTracks)} /> : null}
+            {/* Phones have volume buttons of their own. */}
+            {edges.isPhone ? null : (
+            <>
             <Button size="sm" variant="ghost" label="Vol −" onPress={act(playback.volumeDown)} />
             <Text variant="caption" tone="secondary" style={{ minWidth: 40, textAlign: 'center' }}>
               {Math.round(volume * 100)}%
             </Text>
             <Button size="sm" variant="ghost" label="Vol +" onPress={act(playback.volumeUp)} />
+            </>
+            )}
           </View>
         </View>
       </View>

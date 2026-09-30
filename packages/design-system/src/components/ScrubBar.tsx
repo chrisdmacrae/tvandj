@@ -1,5 +1,5 @@
-import type { ReactNode } from 'react';
-import { View } from 'react-native';
+import { useRef, type ReactNode } from 'react';
+import { View, type GestureResponderEvent } from 'react-native';
 import { colors, focus, radii, spacing } from '../tokens';
 import { Focusable, type FocusableProps } from './Focusable';
 import { Text } from './Text';
@@ -13,6 +13,11 @@ export type ScrubBarProps = Omit<FocusableProps, 'children' | 'style'> & {
   label?: string;
   /** A frame from the scrub position (e.g. a trickplay thumbnail), shown above the knob with the label. */
   preview?: ReactNode;
+  /**
+   * Touch and mouse: a tap or click on the bar jumps to that point (0–1)
+   * instead of pressing it. Leave out on TV, where OK presses it.
+   */
+  onSeek?: (fraction: number) => void;
 };
 
 const KNOB = 28;
@@ -50,10 +55,29 @@ function PauseGlyph({ color }: { color: string }) {
  * shows play/pause state. The bar only renders state; the player decides what
  * OK and Left/Right do while it has focus.
  */
-export function ScrubBar({ value, playing, label, preview, ...rest }: ScrubBarProps) {
+export function ScrubBar({ value, playing, label, preview, onSeek, onPress, ...rest }: ScrubBarProps) {
   const clamped = Math.min(1, Math.max(0, value));
+  const width = useRef(0);
+  const press = (e: GestureResponderEvent) => {
+    // A pointer press lands somewhere on the bar (keyboard and D-pad presses don't): seek there.
+    const x = e.nativeEvent?.locationX;
+    if (onSeek && typeof x === 'number' && width.current > 0 && (e.nativeEvent as { pageX?: number }).pageX) {
+      onSeek(Math.min(1, Math.max(0, x / width.current)));
+    } else {
+      onPress?.(e);
+    }
+  };
   return (
-    <Focusable accessibilityRole="adjustable" focusScale={1} style={{ paddingVertical: spacing.sm }} {...rest}>
+    <Focusable
+      accessibilityRole="adjustable"
+      focusScale={1}
+      style={{ paddingVertical: spacing.sm }}
+      onLayout={(e) => {
+        width.current = e.nativeEvent.layout.width;
+      }}
+      onPress={press}
+      {...rest}
+    >
       {({ focused }) => {
         const trackHeight = focused ? 8 : 5;
         const knobColor = focused ? colors.textPrimary : colors.accent;

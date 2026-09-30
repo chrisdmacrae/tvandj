@@ -4,6 +4,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AvatarButton, IconButton, SettingsIcon, Text, spacing, useLayout } from '@tv-and-j/design-system';
 import { userAvatarUrl, useServerUsers } from '@tv-and-j/core/jellyfin/users';
 import { useAuthedSession } from '@tv-and-j/core/state/SessionContext';
+import { CastButton } from './CastButton';
 
 /**
  * The top of a main section on a phone (there's no top bar there): its name,
@@ -21,6 +22,7 @@ export function SectionHeader({ title }: { title: string }) {
       <Text variant="headline" style={{ flex: 1 }}>
         {title}
       </Text>
+      <CastButton />
       <IconButton accessibilityLabel="Settings" icon={(c) => <SettingsIcon color={c} />} onPress={() => router.push('/settings')} />
       <AvatarButton
         name={auth.userName}

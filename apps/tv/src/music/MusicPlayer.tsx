@@ -3,7 +3,7 @@ import { usePathname } from 'expo-router';
 import { createVideoPlayer, type VideoPlayer } from 'expo-video';
 import { createContext, use, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { report, resolveStream, type Stream } from '@tv-and-j/core/jellyfin/playback';
-import { useRemoteKeys } from '../player/useRemoteKeys';
+import { useRemoteKeys } from '@tv-and-j/player/useRemoteKeys';
 import { useRemoteHandlers } from '../remote/RemoteControl';
 import { useSession } from '@tv-and-j/core/state/SessionContext';
 

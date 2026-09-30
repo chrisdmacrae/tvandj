@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, ScrollView, View } from 'react-native';
 import { Shelf, Text, TextField, colors, spacing, useLayout } from '@tv-and-j/design-system';
-import { useLibrarySearch } from '@tv-and-j/core/jellyfin/library';
+import { requestKey, useDiscoverSearch } from '@tv-and-j/core/downloadarr/hooks';
+import { useLibraryIndex, useLibrarySearch } from '@tv-and-j/core/jellyfin/library';
+import { DiscoverCard } from '../../components/DiscoverCard';
 import { ItemCard } from '../../components/ItemCard';
 import { SectionHeader } from '../../components/SectionHeader';
 import { useBottomSpace } from '../../lib/chrome';
@@ -25,11 +27,20 @@ export default function Search() {
   const query = useDebounced(text, DEBOUNCE_MS);
   const movies = useLibrarySearch('movie', query);
   const shows = useLibrarySearch('tv', query);
+  // Titles from downloadarr you don't have yet (when it's connected).
+  const library = useLibraryIndex().data;
+  const discoverMovies = useDiscoverSearch('movie', query).data ?? [];
+  const discoverShows = useDiscoverSearch('tv', query).data ?? [];
+  const toRequest = [
+    ...discoverMovies.filter((i) => !library?.[requestKey('movie', i.id)]).map((item) => ({ item, kind: 'movie' as const })),
+    ...discoverShows.filter((i) => !library?.[requestKey('tv', i.id)]).map((item) => ({ item, kind: 'tv' as const })),
+  ];
   const searching = query.trim().length >= 2;
   const results = [
     { key: 'movies', title: 'Movies', items: movies.data ?? [] },
     { key: 'shows', title: 'Shows', items: shows.data ?? [] },
   ].filter((r) => r.items.length);
+  const nothing = !results.length && !toRequest.length;
 
   return (
     <ScrollView contentContainerStyle={{ paddingBottom: bottomSpace + spacing.xl }} keyboardShouldPersistTaps="handled">
@@ -37,8 +48,8 @@ export default function Search() {
       <View style={{ paddingHorizontal: gutter, paddingBottom: spacing.lg, maxWidth: 640 + gutter * 2 }}>
         <TextField label="Search" placeholder="Movies and shows" value={text} onChangeText={setText} autoFocus autoCorrect={false} returnKeyType="search" />
       </View>
-      {searching && (movies.isFetching || shows.isFetching) && !results.length ? <ActivityIndicator color={colors.accent} /> : null}
-      {searching && !movies.isFetching && !shows.isFetching && !results.length ? (
+      {searching && (movies.isFetching || shows.isFetching) && nothing ? <ActivityIndicator color={colors.accent} /> : null}
+      {searching && !movies.isFetching && !shows.isFetching && nothing ? (
         <Text tone="secondary" style={{ paddingHorizontal: gutter }}>
           Nothing matches “{query}”.
         </Text>
@@ -46,6 +57,14 @@ export default function Search() {
       {results.map((row) => (
         <Shelf key={row.key} title={row.title} data={row.items} keyExtractor={(item) => item.Id ?? ''} renderItem={({ item }) => <ItemCard item={item} shape="portrait" />} />
       ))}
+      {searching && toRequest.length ? (
+        <Shelf
+          title="Available to request"
+          data={toRequest}
+          keyExtractor={({ item, kind }) => requestKey(kind, item.id)}
+          renderItem={({ item: { item, kind } }) => <DiscoverCard item={item} kind={kind} />}
+        />
+      ) : null}
     </ScrollView>
   );
 }

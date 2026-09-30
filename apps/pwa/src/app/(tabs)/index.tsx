@@ -1,8 +1,10 @@
 import type { BaseItemDto } from '@jellyfin/sdk/lib/generated-client/models';
-import { ActivityIndicator, ScrollView } from 'react-native';
+import { ActivityIndicator, ScrollView, View } from 'react-native';
 import { Shelf, Text, colors, spacing, useLayout, type ArtworkShape } from '@tv-and-j/design-system';
+import { requestKey, useNewForYou, useRequestedItems } from '@tv-and-j/core/downloadarr/hooks';
 import { useMyList } from '@tv-and-j/core/jellyfin/browse';
 import { useContinueWatching, useLatest, useLibraryKinds } from '@tv-and-j/core/jellyfin/library';
+import { DiscoverCard } from '../../components/DiscoverCard';
 import { ItemCard } from '../../components/ItemCard';
 import { SectionHeader } from '../../components/SectionHeader';
 import { useBottomSpace } from '../../lib/chrome';
@@ -20,6 +22,9 @@ export default function Home() {
   const movies = useLatest('movies', has('movies'));
   const shows = useLatest('tvshows', has('tvshows'));
   const music = useLatest('music', has('music'));
+  // downloadarr (when connected, and not for profiles with content limits).
+  const requested = useRequestedItems();
+  const newForYou = useNewForYou();
 
   const rows: Row[] = (
     [
@@ -41,8 +46,17 @@ export default function Home() {
           Nothing here yet. Add some media to your Jellyfin libraries and it will show up here.
         </Text>
       ) : null}
-      {rows.map((row) => (
-        <Shelf key={row.key} title={row.title} data={row.items} keyExtractor={(item) => item.Id ?? ''} renderItem={({ item }) => <ItemCard item={item} shape={row.shape} />} />
+      {requested.length ? (
+        <Shelf title="Requested" data={requested} keyExtractor={({ item, kind }) => requestKey(kind, item.id)} renderItem={({ item: { item, kind } }) => <DiscoverCard item={item} kind={kind} />} />
+      ) : null}
+      {rows.map((row, i) => (
+        <View key={row.key}>
+          <Shelf title={row.title} data={row.items} keyExtractor={(item) => item.Id ?? ''} renderItem={({ item }) => <ItemCard item={item} shape={row.shape} />} />
+          {/* New for you sits after what you're watching and your list, before what's new in the library. */}
+          {newForYou.length && i === Math.min(1, rows.length - 1) ? (
+            <Shelf title="New for you" data={newForYou} keyExtractor={({ item, kind }) => requestKey(kind, item.id)} renderItem={({ item: { item, kind } }) => <DiscoverCard item={item} kind={kind} />} />
+          ) : null}
+        </View>
       ))}
     </ScrollView>
   );

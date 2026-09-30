@@ -22,6 +22,7 @@ function subtitleFor(item: BaseItemDto, shape: ArtworkShape) {
 export function openItem(item: BaseItemDto) {
   if (!item.Id) return;
   if (item.Type === 'MusicAlbum') router.push({ pathname: '/album/[id]', params: { id: item.Id } });
+  else if (item.Type === 'BoxSet') router.push({ pathname: '/collection/[id]', params: { id: item.Id } });
   else if (item.Type === 'Audio') router.push({ pathname: '/watch/[id]', params: { id: item.Id } });
   else router.push({ pathname: '/item/[id]', params: { id: item.Id } });
 }

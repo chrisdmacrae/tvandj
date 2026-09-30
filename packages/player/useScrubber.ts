@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import type { Playback } from './usePlayback';
+import type { PlaybackControls as Playback } from './types';
 
 /** Scrub speeds in seconds of media per second. Each press in one direction steps up. */
 export const SCRUB_RATES = [1, 2, 5, 10, 30, 60, 300];

@@ -1,7 +1,8 @@
 import type { BaseItemDto } from '@jellyfin/sdk/lib/generated-client/models';
 import { Image } from 'expo-image';
 import { View } from 'react-native';
-import { Button, ProgressBar, Text, colors, radii, safeArea, spacing } from '@tv-and-j/design-system';
+import { Button, ProgressBar, Text, colors, radii, spacing } from '@tv-and-j/design-system';
+import { usePlayerEdges, type Insets } from './edges';
 import { landscapeUrl } from '@tv-and-j/core/jellyfin/images';
 import { useAuthedSession } from '@tv-and-j/core/state/SessionContext';
 
@@ -14,10 +15,12 @@ type UpNextCardProps = {
   total: number;
   onPlay: () => void;
   onCancel: () => void;
+  insets?: Insets;
 };
 
 /** "Next episode" card in the bottom-right corner as the credits roll. */
-export function UpNextCard({ episode, countdown, total, onPlay, onCancel }: UpNextCardProps) {
+export function UpNextCard({ episode, countdown, total, onPlay, onCancel, insets }: UpNextCardProps) {
+  const edges = usePlayerEdges(insets);
   const { api } = useAuthedSession();
   const thumb = landscapeUrl(api, episode, THUMB_WIDTH * 2);
   const code = episode.ParentIndexNumber != null && episode.IndexNumber != null ? `S${episode.ParentIndexNumber}:E${episode.IndexNumber}` : undefined;
@@ -25,9 +28,10 @@ export function UpNextCard({ episode, countdown, total, onPlay, onCancel }: UpNe
     <View
       style={{
         position: 'absolute',
-        right: safeArea.horizontal,
-        bottom: safeArea.vertical,
-        width: THUMB_WIDTH * 2 + spacing.lg,
+        right: edges.horizontal,
+        bottom: edges.bottom,
+        // A phone gets the full width, thumbnail beside the details still.
+        ...(edges.isPhone ? { left: edges.horizontal } : { width: THUMB_WIDTH * 2 + spacing.lg }),
         flexDirection: 'row',
         gap: spacing.md,
         padding: spacing.md,
@@ -35,7 +39,7 @@ export function UpNextCard({ episode, countdown, total, onPlay, onCancel }: UpNe
         backgroundColor: colors.scrim,
       }}
     >
-      <View style={{ width: THUMB_WIDTH, aspectRatio: 16 / 9, borderRadius: radii.md, overflow: 'hidden', backgroundColor: colors.surface }}>
+      <View style={{ width: edges.isPhone ? '42%' : THUMB_WIDTH, aspectRatio: 16 / 9, borderRadius: radii.md, overflow: 'hidden', backgroundColor: colors.surface }}>
         {thumb ? <Image source={thumb} cachePolicy="memory-disk" style={{ flex: 1 }} /> : null}
         {countdown != null ? (
           <ProgressBar value={1 - countdown / total} style={{ position: 'absolute', left: 0, right: 0, bottom: 0 }} />

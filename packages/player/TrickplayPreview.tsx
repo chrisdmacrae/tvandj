@@ -30,7 +30,7 @@ export function TrickplayPreview({ trickplay, seconds }: { trickplay: Trickplay;
   const tileRows = Math.min(rows, Math.ceil((count - tile * perTile) / cols));
 
   const scale = DISPLAY_WIDTH / frameWidth;
-  const uri = `${api.basePath}/Videos/${itemId}/Trickplay/${width}/${tile}.jpg?mediaSourceId=${mediaSourceId}&api_key=${api.accessToken}`;
+  const uri = `${api.basePath}/Videos/${itemId}/Trickplay/${width}/${tile}.jpg?mediaSourceId=${mediaSourceId}&ApiKey=${api.accessToken}`;
 
   return (
     <View style={{ width: DISPLAY_WIDTH, height: frameHeight * scale, overflow: 'hidden' }}>

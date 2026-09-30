@@ -203,7 +203,8 @@ export async function resolveStream(api: Api, userId: string, item: BaseItemDto,
     static: 'true',
     mediaSourceId: source.Id,
     playSessionId: data.PlaySessionId,
-    api_key: api.accessToken,
+    // ApiKey, not the old api_key: newer Jellyfin servers turn the old form off by default.
+    ApiKey: api.accessToken,
   });
   let url: string;
   if (directPlay) {

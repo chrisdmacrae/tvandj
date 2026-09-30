@@ -1,5 +1,5 @@
-import { LibraryScreen } from '../../components/LibraryScreen';
+import { BrowseScreen } from '../../components/BrowseScreen';
 
 export default function Movies() {
-  return <LibraryScreen kind="movie" />;
+  return <BrowseScreen kind="movie" />;
 }

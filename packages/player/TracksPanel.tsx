@@ -1,5 +1,6 @@
 import { ActivityIndicator, ScrollView, TVFocusGuideView, View } from 'react-native';
-import { ListItem, Text, colors, radii, safeArea, spacing } from '@tv-and-j/design-system';
+import { ListItem, Text, colors, radii, spacing } from '@tv-and-j/design-system';
+import { usePlayerEdges, type Insets } from './edges';
 import type { Stream, Track } from '@tv-and-j/core/jellyfin/playback';
 
 const FocusGuide = TVFocusGuideView ?? View;
@@ -10,6 +11,7 @@ type TracksPanelProps = {
   switching: boolean;
   onSelectAudio: (index: number) => void;
   onSelectSubtitle: (index: number) => void;
+  insets?: Insets;
 };
 
 function subtitleNote(track: Track) {
@@ -21,7 +23,8 @@ function subtitleNote(track: Track) {
  * Audio and subtitle picker over the right side of the player. Back closes it
  * (handled by the screen). Focus stays inside while it's open.
  */
-export function TracksPanel({ stream, switching, onSelectAudio, onSelectSubtitle }: TracksPanelProps) {
+export function TracksPanel({ stream, switching, onSelectAudio, onSelectSubtitle, insets }: TracksPanelProps) {
+  const edges = usePlayerEdges(insets);
   const audioFocus = stream.audio.find((t) => t.index === stream.audioIndex) ?? stream.audio[0];
   return (
     <FocusGuide
@@ -35,11 +38,13 @@ export function TracksPanel({ stream, switching, onSelectAudio, onSelectSubtitle
         top: 0,
         bottom: 0,
         right: 0,
-        width: '62%',
-        flexDirection: 'row',
+        // Beside the video on bigger screens; the whole screen on a phone.
+        width: edges.isPhone ? '100%' : '62%',
+        flexDirection: edges.isPhone ? 'column' : 'row',
         gap: spacing.lg,
-        paddingHorizontal: safeArea.horizontal,
-        paddingVertical: safeArea.vertical,
+        paddingHorizontal: edges.horizontal,
+        paddingTop: edges.top,
+        paddingBottom: edges.bottom,
         backgroundColor: colors.scrim,
         borderTopLeftRadius: radii.lg,
         borderBottomLeftRadius: radii.lg,

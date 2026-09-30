@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react';
 import type { Segment } from '@tv-and-j/core/jellyfin/segments';
-import type { Playback } from './usePlayback';
+import type { PlaybackControls as Playback } from './types';
 
 const LABELS: Record<string, string> = {
   Intro: 'Skip intro',

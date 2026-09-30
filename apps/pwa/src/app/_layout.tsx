@@ -9,6 +9,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { colors } from '@tv-and-j/design-system';
 import { SessionProvider, useSession } from '@tv-and-j/core/state/SessionContext';
 import { SettingsProvider } from '@tv-and-j/core/state/SettingsContext';
+import { RemoteTargetProvider } from '../lib/remoteTarget';
 
 const theme = {
   ...DarkTheme,
@@ -36,6 +37,10 @@ function RootStack() {
           <Stack.Screen name="item/[id]" />
           <Stack.Screen name="album/[id]" />
           <Stack.Screen name="watch/[id]" />
+          <Stack.Screen name="discover/[kind]/[tmdbId]" />
+          <Stack.Screen name="library/[kind]" />
+          <Stack.Screen name="collection/[id]" />
+          <Stack.Screen name="remote/[id]" />
           <Stack.Screen name="settings" />
         </Stack.Protected>
       </Stack.Protected>
@@ -59,7 +64,9 @@ export default function RootLayout() {
         <QueryClientProvider client={queryClient}>
           <SessionProvider>
             <SettingsProvider>
-              <RootStack />
+              <RemoteTargetProvider>
+                <RootStack />
+              </RemoteTargetProvider>
             </SettingsProvider>
           </SessionProvider>
         </QueryClientProvider>

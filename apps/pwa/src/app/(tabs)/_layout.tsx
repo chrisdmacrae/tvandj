@@ -19,7 +19,10 @@ import {
 import { useLibraryKinds } from '@tv-and-j/core/jellyfin/library';
 import { userAvatarUrl, useServerUsers } from '@tv-and-j/core/jellyfin/users';
 import { useAuthedSession } from '@tv-and-j/core/state/SessionContext';
+import { CastButton } from '../../components/CastButton';
+import { RemoteBar } from '../../components/RemoteBar';
 import { BottomSpaceContext } from '../../lib/chrome';
+import { useRemoteTarget } from '../../lib/remoteTarget';
 
 type Tab = { key: '/' | '/movies' | '/tv' | '/music' | '/search'; label: string; icon: (color: string) => React.ReactNode };
 
@@ -31,6 +34,8 @@ const SEARCH: Tab = { key: '/search', label: 'Search', icon: (c) => <SearchIcon 
 
 /** Bottom navigation height before the home-indicator inset. */
 const BOTTOM_NAV = 58;
+/** Room for the "Playing on…" bar while controlling another screen. */
+const REMOTE_BAR = 88;
 
 function ProfileButton() {
   const { api, auth } = useAuthedSession();
@@ -58,9 +63,10 @@ export default function TabsLayout() {
   const all = [...sections, SEARCH];
   const selected = all.find((t) => t.key !== '/' && pathname.startsWith(t.key))?.key ?? '/';
   const go = (key: string) => key !== selected && router.replace(key as Tab['key']);
+  const remoteSpace = useRemoteTarget().sessionId ? REMOTE_BAR : 0;
 
   if (isPhone) {
-    const bottomSpace = BOTTOM_NAV + insets.bottom;
+    const bottomSpace = BOTTOM_NAV + insets.bottom + remoteSpace;
     return (
       <View style={{ flex: 1, backgroundColor: colors.canvas }}>
         <BottomSpaceContext value={bottomSpace}>
@@ -68,6 +74,7 @@ export default function TabsLayout() {
             <Slot />
           </View>
         </BottomSpaceContext>
+        <RemoteBar bottom={BOTTOM_NAV + insets.bottom} />
         <View style={{ position: 'absolute', left: 0, right: 0, bottom: 0 }}>
           <BottomNav items={all} selected={selected} onSelect={go} bottomInset={insets.bottom} />
         </View>
@@ -83,15 +90,19 @@ export default function TabsLayout() {
         onSelect={go}
         trailing={
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
+            <CastButton />
             <IconButton accessibilityLabel="Search" selected={selected === '/search'} icon={(c) => <SearchIcon color={c} />} onPress={() => go('/search')} />
             <IconButton accessibilityLabel="Settings" icon={(c) => <SettingsIcon color={c} />} onPress={() => router.push('/settings')} />
             <ProfileButton />
           </View>
         }
       />
-      <View style={{ flex: 1 }}>
-        <Slot />
-      </View>
+      <BottomSpaceContext value={remoteSpace}>
+        <View style={{ flex: 1 }}>
+          <Slot />
+        </View>
+      </BottomSpaceContext>
+      <RemoteBar bottom={insets.bottom} />
     </View>
   );
 }

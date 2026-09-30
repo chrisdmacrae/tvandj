@@ -56,7 +56,7 @@ class SearchProvider : ContentProvider() {
     try {
       val url = URL(
         "$base/Items?userId=$userId&searchTerm=${URLEncoder.encode(query, "UTF-8")}" +
-          "&IncludeItemTypes=Movie,Series&Recursive=true&Limit=$LIMIT&Fields=ProductionYear&api_key=$token",
+          "&IncludeItemTypes=Movie,Series&Recursive=true&Limit=$LIMIT&Fields=ProductionYear&ApiKey=$token",
       )
       val connection = (url.openConnection() as HttpURLConnection).apply {
         connectTimeout = TIMEOUT_MS

@@ -2,6 +2,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { createContext, use, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { AppState } from 'react-native';
 import { useSession } from './SessionContext';
+import { pullHousehold, pushHousehold, type HouseholdAccess, type HouseholdState } from './householdSync';
 import { pullSettings, pushSettings } from './settingsSync';
 
 /** Wait for a burst of changes (tapping through chips) to settle before saving to Jellyfin. */
@@ -46,6 +47,14 @@ type SettingsState = {
   settings: Settings;
   ready: boolean;
   update: (patch: Partial<Settings>) => Promise<void>;
+  /**
+   * Household settings (the downloadarr address) through the TV and J Jellyfin
+   * plugin: 'none' without the plugin (they're per device), 'read' when an
+   * administrator sets them for everyone, 'write' for administrators.
+   */
+  householdAccess: HouseholdAccess;
+  /** The downloadarr address in use came from the household settings, not this device. */
+  downloadarrFromHousehold: boolean;
 };
 
 const SettingsContext = createContext<SettingsState | null>(null);
@@ -129,9 +138,21 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
   const updatedAt = useRef(0);
   const apiRef = useRef(api);
   apiRef.current = api;
+  const [household, setHousehold] = useState<HouseholdState>({ access: 'none', value: {}, updatedAt: 0 });
+  const householdRef = useRef(household);
+  householdRef.current = household;
 
-  /** Take Jellyfin's copy of this profile's settings if it's newer than ours. */
+  /** The household settings from the server; a newer copy there replaces ours. */
+  const pullHouseholdSettings = useCallback(async () => {
+    const current = apiRef.current;
+    if (!current) return setHousehold({ access: 'none', value: {}, updatedAt: 0 });
+    const remote = await pullHousehold(current);
+    setHousehold((local) => (remote.access === 'none' || remote.updatedAt >= local.updatedAt ? remote : { ...local, access: remote.access }));
+  }, []);
+
+  /** Take Jellyfin's copy of this profile's settings, and the household's, if newer than ours. */
   const pull = useCallback(async () => {
+    pullHouseholdSettings();
     const current = apiRef.current;
     if (!current || !userId) return;
     const remote = await pullSettings<ProfileSettings>(current, userId);
@@ -153,7 +174,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
       AsyncStorage.setItem(profileKey(userId), JSON.stringify(stored)).catch(() => {});
       return combine(split(prev).device, profile);
     });
-  }, [userId]);
+  }, [userId, pullHouseholdSettings]);
 
   useEffect(() => {
     let cancelled = false;
@@ -199,6 +220,14 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
 
   const update = useCallback(
     async (patch: Partial<Settings>) => {
+      // An administrator changing a household setting changes it for everyone.
+      const current = apiRef.current;
+      if ('downloadarrUrl' in patch && current && householdRef.current.access === 'write') {
+        const stamp = Date.now();
+        const value = { ...householdRef.current.value, downloadarrUrl: patch.downloadarrUrl ?? null };
+        setHousehold({ access: 'write', value, updatedAt: stamp });
+        pushHousehold(current, value, stamp).then((saved) => saved && setHousehold(saved));
+      }
       setSettings((prev) => {
         const next = { ...prev, ...patch };
         const before = split(prev);
@@ -222,7 +251,17 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
     [userId],
   );
 
-  const value = useMemo(() => ({ settings, ready, update }), [settings, ready, update]);
+  // The household's downloadarr address, when there is one, beats this device's own.
+  const downloadarrFromHousehold = household.access !== 'none' && household.value.downloadarrUrl !== undefined;
+  const effective = useMemo(
+    () => (downloadarrFromHousehold ? { ...settings, downloadarrUrl: household.value.downloadarrUrl ?? null } : settings),
+    [settings, downloadarrFromHousehold, household.value.downloadarrUrl],
+  );
+
+  const value = useMemo(
+    () => ({ settings: effective, ready, update, householdAccess: household.access, downloadarrFromHousehold }),
+    [effective, ready, update, household.access, downloadarrFromHousehold],
+  );
   return <SettingsContext value={value}>{children}</SettingsContext>;
 }
 

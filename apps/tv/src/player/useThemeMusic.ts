@@ -20,7 +20,7 @@ export function useThemeSongUrl(item: BaseItemDto | undefined) {
     queryFn: async () => {
       const { data } = await getLibraryApi(api).getThemeSongs({ itemId: item!.Id!, userId: auth.userId, inheritFromParent: true });
       const song = data.Items?.[0];
-      return song?.Id ? `${api.basePath}/Audio/${song.Id}/stream?static=true&api_key=${api.accessToken}` : null;
+      return song?.Id ? `${api.basePath}/Audio/${song.Id}/stream?static=true&ApiKey=${api.accessToken}` : null;
     },
   }).data ?? undefined;
 }

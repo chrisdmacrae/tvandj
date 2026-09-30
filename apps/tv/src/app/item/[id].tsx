@@ -3,7 +3,7 @@ import { router, useIsFocused, useLocalSearchParams } from 'expo-router';
 import { VideoView } from 'expo-video';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Image } from 'expo-image';
-import { ActivityIndicator, Animated, BackHandler, Platform, Pressable, ScrollView, View, useWindowDimensions, type LayoutChangeEvent } from 'react-native';
+import { ActivityIndicator, Animated, BackHandler, Platform, ScrollView, View, useWindowDimensions, type LayoutChangeEvent } from 'react-native';
 import Svg, { Defs, LinearGradient, Rect, Stop } from 'react-native-svg';
 import { ArrowLeftIcon, Button, Chip, DownloadBar, IconButton, Shelf, Text, colors, safeArea, spacing } from '@tv-and-j/design-system';
 import { backdropUrl, logoUrl, posterUrl } from '@tv-and-j/core/jellyfin/images';
@@ -19,12 +19,9 @@ import { useSimilar, useToggleFavorite, useTogglePlayed } from '@tv-and-j/core/j
 import { useItem, usePlayQueue } from '@tv-and-j/core/jellyfin/library';
 import { useNextEpisode, useSegments } from '@tv-and-j/core/jellyfin/segments';
 import { useRatings } from '@tv-and-j/core/jellyfin/ratings';
-import { PlayerControls, formatTime } from '../../player/PlayerControls';
+import { formatTime } from '@tv-and-j/player/PlayerControls';
+import { PlayerOverlay } from '@tv-and-j/player/PlayerOverlay';
 import { usePlayback } from '../../player/usePlayback';
-import { useScrubber } from '../../player/useScrubber';
-import { useRemoteKeys } from '../../player/useRemoteKeys';
-import { UpNextCard } from '../../player/UpNextCard';
-import { useSegmentSkip } from '../../player/useSegmentSkip';
 import { useRemoteHandlers } from '../../remote/RemoteControl';
 import { useThemeMusic, useThemeSongUrl } from '../../player/useThemeMusic';
 import { useAuthedSession } from '@tv-and-j/core/state/SessionContext';
@@ -35,16 +32,11 @@ type Phase = 'summary' | 'preview' | 'player';
 
 const ART_HOLD_MS = 5_000;
 const PREVIEW_MS = 15_000;
-const CONTROLS_HIDE_MS = 5_000;
 const FADE_MS = 800;
 const EXIT_FADE_MS = 500;
 /** How much of what's below the summary (seasons, cast, more like this) peeks in before scrolling, so it's clear there's more. */
 const MORE_PEEK = 96;
 const CAST_LIMIT = 20;
-/** Without a credits marker, offer the next episode this close to the end. */
-const UP_NEXT_BEFORE_END_S = 30;
-const UP_NEXT_COUNTDOWN_S = 10;
-const REMOTE_KEYS = new Set(['up', 'down', 'left', 'right', 'select', 'playPause', 'play', 'pause', 'rewind', 'fastForward', 'info']);
 
 function runtime(ticks?: number | null) {
   if (!ticks) return undefined;
@@ -89,21 +81,11 @@ export default function ItemScreen() {
   const downloadStatus =
     download.status && item?.Type === 'Series' ? `New episodes · ${download.status.toLowerCase()}` : download.status;
   // Stable callbacks; `playback` itself is a new object every time-update render.
-  const { start, togglePlay } = playback;
-  const scrubber = useScrubber(playback);
-  const scrubbing = useRef(false);
-  scrubbing.current = scrubber.scrubbing;
-  const { step: scrubStep, commit: scrubCommit } = scrubber;
+  const { start } = playback;
 
   const [phase, setPhase] = useState<Phase>('summary');
-  const [controlsVisible, setControlsVisible] = useState(false);
   // Set once the viewer moves into the season/episode browser: hold the preview, don't go full screen.
   const [browsing, setBrowsing] = useState(false);
-  const controlsShown = useRef(false);
-  controlsShown.current = controlsVisible;
-  const [tracksOpen, setTracksOpen] = useState(false);
-  const tracksOpenRef = useRef(false);
-  tracksOpenRef.current = tracksOpen;
   // "Start over" from the summary: begin at 0:00 instead of the resume point.
   const fromStart = useRef(false);
   // The page scrolls: the summary, then seasons, cast and more like this below it.
@@ -218,34 +200,12 @@ export default function ItemScreen() {
     Animated.timing(expand, { toValue: 1, duration: FADE_MS, useNativeDriver: false }).start();
   }, [phase, start, expand, videoOpacity]);
 
-  // Controls: any remote key wakes them; they sleep after a few idle seconds.
-  const hideTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
-  const wakeControls = useCallback(() => {
-    setControlsVisible(true);
-    clearTimeout(hideTimer.current);
-    const hide = () => {
-      // Never pull the controls out from under an active scrub or the track picker.
-      if (scrubbing.current || tracksOpenRef.current) hideTimer.current = setTimeout(hide, CONTROLS_HIDE_MS);
-      else setControlsVisible(false);
-    };
-    hideTimer.current = setTimeout(hide, CONTROLS_HIDE_MS);
-  }, []);
-  useEffect(() => () => clearTimeout(hideTimer.current), []);
-  useEffect(() => {
-    if (phase === 'player') wakeControls();
-  }, [phase, wakeControls]);
-
-  // Intro/recap/credits skipping, and the next episode as the credits roll.
+  // Intro/recap/credits (for Skip, and to time the next-episode card) and the next episode.
+  // The player overlay (shared with the web app) does the rest.
   const nowPlayingId = playback.stream?.itemId;
   const segments = useSegments(nowPlayingId).data ?? [];
-  const skipper = useSegmentSkip(playback, segments, { enabled: phase === 'player', autoSkip: settings.playback.autoSkipIntro });
   const nextEpisode = useNextEpisode(playback.current).data ?? null;
-  const [upNextDismissed, setUpNextDismissed] = useState(false);
-  useEffect(() => setUpNextDismissed(false), [nowPlayingId]);
-  const outro = segments.find((s) => s.type === 'Outro');
-  const creditsAt = outro ? outro.start : playback.duration > UP_NEXT_BEFORE_END_S * 4 ? playback.duration - UP_NEXT_BEFORE_END_S : Infinity;
-  const inCredits = phase === 'player' && !!nextEpisode && playback.currentTime >= creditsAt;
-  const upNextShown = inCredits && !upNextDismissed && !controlsVisible && !tracksOpen;
+  const upNextDismissed = useRef(false);
 
   const playNext = useCallback(() => {
     if (!nextEpisode?.Id) return;
@@ -254,26 +214,10 @@ export default function ItemScreen() {
     router.replace({ pathname: '/item/[id]', params: { id: nextEpisode.Id, autoplay: '1' } });
   }, [nextEpisode]);
 
-  // Counts down while the card is up and the episode is playing; any interaction (controls) pauses it.
-  const [countdown, setCountdown] = useState(UP_NEXT_COUNTDOWN_S);
-  const counting = upNextShown && settings.playback.autoplayNext && playback.isPlaying;
-  useEffect(() => {
-    if (!inCredits) setCountdown(UP_NEXT_COUNTDOWN_S);
-  }, [inCredits]);
-  useEffect(() => {
-    if (!counting) return;
-    const tick = 250;
-    const timer = setInterval(() => setCountdown((c) => Math.max(0, c - tick / 1000)), tick);
-    return () => clearInterval(timer);
-  }, [counting]);
-  useEffect(() => {
-    if (counting && countdown <= 0) playNext();
-  }, [counting, countdown, playNext]);
-
   // The end of the last queue item: on to the next episode when allowed, otherwise back out.
   onEnd.current = () => {
     if (phase !== 'player') return;
-    if (nextEpisode && settings.playback.autoplayNext && !upNextDismissed) playNext();
+    if (nextEpisode && settings.playback.autoplayNext && !upNextDismissed.current) playNext();
     else if (!playback.isAudio) leave();
   };
 
@@ -296,69 +240,15 @@ export default function ItemScreen() {
     focused && phase === 'player',
   );
 
-  // A skip or next-episode button takes focus from the hidden controls; OK on it shouldn't also wake them.
-  const overlayAction = phase === 'player' && !controlsVisible && !tracksOpen && (upNextShown || !!skipper.segment);
-  const overlayActionRef = useRef(false);
-  overlayActionRef.current = overlayAction;
-  const upNextShownRef = useRef(false);
-  upNextShownRef.current = upNextShown;
-
-  useRemoteKeys(
-    useCallback(
-      (event) => {
-        // Android delivers key-up (1) for these; skip key-down (0) where it also arrives so a press counts once.
-        // Also ignore the focus/blur pseudo-events the handler emits.
-        if (phase !== 'player' || event.eventKeyAction === 0 || !REMOTE_KEYS.has(event.eventType)) return;
-        if (overlayActionRef.current && (event.eventType === 'select' || (upNextShownRef.current && (event.eventType === 'left' || event.eventType === 'right')))) {
-          return; // the focused Skip / Next episode buttons handle these
-        }
-        switch (event.eventType) {
-          case 'playPause':
-          case 'play':
-          case 'pause':
-            if (scrubbing.current) scrubCommit();
-            else togglePlay();
-            break;
-          // The remote's ⏪/⏩ keys drive the same continuous scrub as the timeline.
-          case 'rewind':
-            scrubStep(-1);
-            break;
-          case 'fastForward':
-            scrubStep(1);
-            break;
-          // With the controls hidden, Left/Right start scrubbing straight away (OK only wakes the
-          // controls). Once visible, the focused timeline handles these itself.
-          case 'left':
-            if (!controlsShown.current && !tracksOpenRef.current) scrubStep(-1);
-            break;
-          case 'right':
-            if (!controlsShown.current && !tracksOpenRef.current) scrubStep(1);
-            break;
-        }
-        wakeControls();
-      },
-      [phase, togglePlay, scrubStep, scrubCommit, wakeControls],
-    ),
-  );
-
-  // Back: first hides the controls, then leaves.
+  // Back on the summary and preview leaves; in the player, the overlay handles it (controls first).
   useEffect(() => {
-    if (Platform.OS === 'web') return;
+    if (Platform.OS === 'web' || phase === 'player') return;
     const sub = BackHandler.addEventListener('hardwareBackPress', () => {
-      if (phase === 'player' && tracksOpen) {
-        setTracksOpen(false);
-        wakeControls();
-      } else if (phase === 'player' && controlsVisible) {
-        setControlsVisible(false);
-      } else if (upNextShown) {
-        setUpNextDismissed(true);
-      } else {
-        leave();
-      }
+      leave();
       return true;
     });
     return () => sub.remove();
-  }, [phase, controlsVisible, tracksOpen, upNextShown, leave, wakeControls]);
+  }, [phase, leave]);
 
   const playNow = () => setPhase('player');
   const startOver = () => {
@@ -639,59 +529,19 @@ export default function ItemScreen() {
         </View>
       ) : null}
 
-      {upNextShown && nextEpisode ? (
-        <UpNextCard
-          episode={nextEpisode}
-          countdown={settings.playback.autoplayNext ? countdown : undefined}
-          total={UP_NEXT_COUNTDOWN_S}
-          onPlay={playNext}
-          onCancel={() => setUpNextDismissed(true)}
-        />
-      ) : overlayAction && skipper.label ? (
-        <View style={{ position: 'absolute', right: safeArea.horizontal, bottom: safeArea.vertical + spacing.lg }}>
-          <Button label={skipper.label} variant="secondary" hasTVPreferredFocus onPress={skipper.skip} />
-        </View>
-      ) : null}
-
-      {phase === 'player' && !controlsVisible && !overlayAction ? (
-        // While the controls sleep, this invisible full-screen target holds D-pad focus so
-        // key presses keep reaching the app; any of them wakes the controls.
-        <Pressable
-          focusable
-          hasTVPreferredFocus
-          accessibilityLabel="Show player controls"
-          onPress={wakeControls}
-          style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}
-        />
-      ) : null}
-
-      {phase === 'player' && controlsVisible ? (
-        <PlayerControls
-          playback={playback}
-          scrubber={scrubber}
-          title={playback.isAudio ? (nowPlaying?.Name ?? title) : title}
-          subtitle={playback.isAudio ? artists : episodeLine(nowPlaying ?? item)}
-          onInteract={wakeControls}
-          onBack={leave}
-          tracksOpen={tracksOpen}
-          onOpenTracks={() => setTracksOpen(true)}
-          action={
-            inCredits && nextEpisode ? (
-              <Button label="Next episode" size="sm" variant="secondary" onPress={playNext} />
-            ) : skipper.label ? (
-              <Button
-                label={skipper.label}
-                size="sm"
-                variant="secondary"
-                onPress={() => {
-                  skipper.skip();
-                  wakeControls();
-                }}
-              />
-            ) : undefined
-          }
-        />
-      ) : null}
+      <PlayerOverlay
+        playback={playback}
+        active={phase === 'player' && focused}
+        title={playback.isAudio ? (nowPlaying?.Name ?? title) : title}
+        subtitle={playback.isAudio ? artists : episodeLine(nowPlaying ?? item)}
+        nextEpisode={nextEpisode}
+        segments={segments}
+        autoSkipIntro={settings.playback.autoSkipIntro}
+        autoplayNext={settings.playback.autoplayNext}
+        onBack={leave}
+        onPlayNext={playNext}
+        upNextDismissedRef={upNextDismissed}
+      />
 
       <Animated.View
         pointerEvents="none"

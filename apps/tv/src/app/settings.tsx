@@ -19,23 +19,8 @@ import { Downloadarr, findDownloadarr, normalizeBaseUrl } from '@tv-and-j/core/d
 import { isRestricted, ratingLimitLabel, useCurrentUser, useParentalRatings, useUpdateUserConfiguration } from '@tv-and-j/core/jellyfin/users';
 import { hasPin } from '@tv-and-j/core/state/profilePins';
 import { useAuthedSession } from '@tv-and-j/core/state/SessionContext';
-import { useSettings, type Codec, type Language, type Quality, type Settings } from '@tv-and-j/core/state/SettingsContext';
-
-const QUALITIES: { value: Quality; label: string }[] = [
-  { value: '1080p', label: '1080p' },
-  { value: '4k', label: '4K' },
-];
-const CODECS: { value: Codec; label: string }[] = [
-  { value: 'h264', label: 'H.264' },
-  { value: 'hevc', label: 'HEVC (H.265)' },
-];
-const LANGUAGES: { value: Language; label: string }[] = [
-  { value: 'english', label: 'English' },
-  { value: 'french', label: 'French' },
-  { value: 'german', label: 'German' },
-  { value: 'spanish', label: 'Spanish' },
-  { value: 'japanese', label: 'Japanese' },
-];
+import { useSettings, type Settings } from '@tv-and-j/core/state/SettingsContext';
+import { CODECS, LANGUAGES, QUALITIES } from '@tv-and-j/core/downloadarr/requestOptions';
 
 /** Jellyfin's language codes (ISO 639-2). Empty means no preference: the file's default. */
 const TRACK_LANGUAGES = [
@@ -119,8 +104,13 @@ function Choices<T extends string>({
 
 export default function SettingsScreen() {
   const { server, auth, signOut, forgetServer } = useAuthedSession();
-  const { settings, update } = useSettings();
+  const { settings, update, householdAccess, downloadarrFromHousehold } = useSettings();
+  // Set for the household by an administrator: others see it but can't change it.
+  const householdLocked = householdAccess === 'read' && downloadarrFromHousehold;
   const [address, setAddress] = useState(settings.downloadarrUrl ?? '');
+  useEffect(() => {
+    setAddress(settings.downloadarrUrl ?? '');
+  }, [settings.downloadarrUrl]);
   const [check, setCheck] = useState<{ state: 'idle' | 'checking' | 'found' | 'ok' | 'error'; message?: string }>({ state: 'idle' });
 
   const setRequest = (patch: Partial<Settings['request']>) => update({ request: { ...settings.request, ...patch } });
@@ -301,8 +291,20 @@ export default function SettingsScreen() {
             <>
               <Section
                 title="downloadarr"
-                description="Optional. Connect downloadarr to discover new movies and shows, request them, and follow their downloads."
+                description={`Optional. Connect downloadarr to discover new movies and shows, request them, and follow their downloads. ${
+                  householdAccess === 'write'
+                    ? 'Shared with everyone in your household, on every device.'
+                    : householdLocked
+                      ? 'Set for your household by an administrator.'
+                      : householdAccess === 'read'
+                        ? 'Just for this TV (an administrator can set it for the whole household).'
+                        : 'Just for this TV. Install the TV and J plugin on your Jellyfin server to share it with every device.'
+                }`}
               >
+                {householdLocked ? (
+                  <Text tone="secondary">{settings.downloadarrUrl ?? 'Not connected'}</Text>
+                ) : (
+                <>
                 <TextField
                   label="Address"
                   placeholder="192.168.1.20:3001"
@@ -343,6 +345,8 @@ export default function SettingsScreen() {
                     />
                   ) : null}
                 </View>
+                </>
+                )}
               </Section>
 
               {settings.downloadarrUrl ? (

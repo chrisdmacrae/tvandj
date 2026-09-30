@@ -316,3 +316,28 @@ export function useDiscoverSearch(kind: MediaKind, query: string) {
     queryFn: () => client!.search(kind, q),
   });
 }
+
+const NEW_FOR_YOU_LIMIT = 20;
+
+/**
+ * "New for you": popular movies and shows from downloadarr that aren't in the
+ * library yet, interleaved so neither kind dominates. Empty without downloadarr.
+ */
+export function useNewForYou(limit = NEW_FOR_YOU_LIMIT) {
+  const client = useDownloadarr();
+  const movies = usePopular('movie');
+  const shows = usePopular('tv');
+  const library = useLibraryIndex();
+  return useMemo(() => {
+    if (!client) return [];
+    const notOwned = (kind: MediaKind) => (item: DiscoverItem) => !library.data?.[requestKey(kind, item.id)];
+    const m = (movies.data ?? []).filter(notOwned('movie'));
+    const s = (shows.data ?? []).filter(notOwned('tv'));
+    const mixed: { item: DiscoverItem; kind: MediaKind }[] = [];
+    for (let i = 0; i < Math.max(m.length, s.length) && mixed.length < limit; i++) {
+      if (m[i]) mixed.push({ item: m[i], kind: 'movie' });
+      if (s[i]) mixed.push({ item: s[i], kind: 'tv' });
+    }
+    return mixed;
+  }, [client, movies.data, shows.data, library.data, limit]);
+}

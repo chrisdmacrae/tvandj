@@ -1,0 +1,18 @@
+{
+  "name": "@tv-and-j/player",
+  "version": "0.1.0",
+  "private": true,
+  "description": "The player UI both apps share: controls, scrubbing, audio & subtitles, skip intro, up next. Import by path, e.g. @tv-and-j/player/PlayerOverlay.",
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "peerDependencies": {
+    "@jellyfin/sdk": "*",
+    "@tv-and-j/core": "*",
+    "@tv-and-j/design-system": "*",
+    "expo-image": "*",
+    "react": "*",
+    "react-native": "*",
+    "react-native-svg": "*"
+  }
+}

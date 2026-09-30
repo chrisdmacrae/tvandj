@@ -1,43 +1,17 @@
 import type { BaseItemDto } from '@jellyfin/sdk/lib/generated-client/models';
-import { useMemo } from 'react';
 import { ActivityIndicator, ScrollView } from 'react-native';
 import { Shelf, Text, colors, safeArea, spacing, type ArtworkShape } from '@tv-and-j/design-system';
 import { DiscoverCard } from '../../components/DiscoverCard';
 import { MediaCard } from '../../components/MediaCard';
 import { RequestedRow } from '../../components/RequestedRow';
 import type { DiscoverItem, MediaKind } from '@tv-and-j/core/downloadarr/client';
-import { useDownloadarr, usePopular, requestKey, useRequestedItems } from '@tv-and-j/core/downloadarr/hooks';
+import { requestKey, useNewForYou, useRequestedItems } from '@tv-and-j/core/downloadarr/hooks';
 import { useMyList } from '@tv-and-j/core/jellyfin/browse';
-import { useContinueWatching, useLatest, useLibraryIndex, useLibraryKinds } from '@tv-and-j/core/jellyfin/library';
+import { useContinueWatching, useLatest, useLibraryKinds } from '@tv-and-j/core/jellyfin/library';
 
 type Row =
   | { key: string; title: string; kind: 'library'; shape: ArtworkShape; items: BaseItemDto[] }
   | { key: string; title: string; kind: 'discover'; items: { item: DiscoverItem; kind: MediaKind }[] };
-
-const NEW_FOR_YOU_LIMIT = 20;
-
-/**
- * Popular movies and shows from downloadarr that aren't in the library yet,
- * interleaved so neither kind dominates. Empty when downloadarr isn't set up.
- */
-function useNewForYou() {
-  const client = useDownloadarr();
-  const movies = usePopular('movie');
-  const shows = usePopular('tv');
-  const library = useLibraryIndex();
-  return useMemo(() => {
-    if (!client) return [];
-    const notOwned = (kind: MediaKind) => (item: DiscoverItem) => !library.data?.[requestKey(kind, item.id)];
-    const m = (movies.data ?? []).filter(notOwned('movie'));
-    const s = (shows.data ?? []).filter(notOwned('tv'));
-    const mixed: { item: DiscoverItem; kind: MediaKind }[] = [];
-    for (let i = 0; i < Math.max(m.length, s.length) && mixed.length < NEW_FOR_YOU_LIMIT; i++) {
-      if (m[i]) mixed.push({ item: m[i], kind: 'movie' });
-      if (s[i]) mixed.push({ item: s[i], kind: 'tv' });
-    }
-    return mixed;
-  }, [client, movies.data, shows.data, library.data]);
-}
 
 export default function Home() {
   const kinds = useLibraryKinds();

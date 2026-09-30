@@ -164,3 +164,18 @@ export function MusicIcon({ color, size = 20 }: IconProps) {
     </Svg>
   );
 }
+
+/** Cast / play on another screen: a screen with signal waves in its corner. */
+export function CastIcon({ color, size = 20 }: IconProps) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <Path
+        d="M3 16a5 5 0 0 1 5 5M3 12a9 9 0 0 1 9 9M3 8V6a1 1 0 0 1 1-1h16a1 1 0 0 1 1 1v12a1 1 0 0 1-1 1h-5M3 20.5h.01"
+        stroke={color}
+        strokeWidth={2}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </Svg>
+  );
+}
