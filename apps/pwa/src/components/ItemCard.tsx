@@ -3,7 +3,9 @@ import { router } from 'expo-router';
 import { memo } from 'react';
 import { PosterCard, type ArtworkShape } from '@tv-and-j/design-system';
 import { landscapeUrl, posterUrl } from '@tv-and-j/core/jellyfin/images';
+import { useSetGlow } from '@tv-and-j/core/state/GlowContext';
 import { useAuthedSession } from '@tv-and-j/core/state/SessionContext';
+import { itemGlow } from '../lib/glowColor';
 
 function subtitleFor(item: BaseItemDto, shape: ArtworkShape) {
   if (item.Type === 'Episode') {
@@ -33,6 +35,9 @@ export const ItemCard = memo(function ItemCard({ item, shape }: { item: BaseItem
   const title = item.Type === 'Episode' ? (item.SeriesName ?? item.Name ?? '') : (item.Name ?? '');
   const played = item.UserData?.PlayedPercentage;
   const unplayed = item.Type === 'Series' ? item.UserData?.UnplayedItemCount : undefined;
+  const setGlow = useSetGlow();
+  // Keyboard focus or the mouse over it: either one lights the glow.
+  const glow = () => setGlow(itemGlow(item, shape === 'landscape' ? ['Thumb', 'Primary', 'Backdrop'] : ['Primary']));
   return (
     <PosterCard
       shape={shape}
@@ -42,6 +47,8 @@ export const ItemCard = memo(function ItemCard({ item, shape }: { item: BaseItem
       progress={played ? played / 100 : undefined}
       badge={unplayed ? String(unplayed) : undefined}
       watched={item.UserData?.Played && !played && item.Type !== 'Series'}
+      onFocus={glow}
+      onHoverIn={glow}
       onPress={() => openItem(item)}
     />
   );

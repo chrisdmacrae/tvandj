@@ -31,6 +31,7 @@ import {
 import { DiscoverCard } from '../../../components/DiscoverCard';
 import { FittedText } from '../../../components/FittedText';
 import { TmdbPersonCard } from '../../../components/PersonCard';
+import { RemoveRequestButton } from '../../../components/RemoveRequestButton';
 import { SeasonBrowser } from '../../../components/SeasonBrowser';
 import { YouTubeTrailer } from '../../../components/YouTubeTrailer';
 import { useJellyfinSeries } from '@tv-and-j/core/jellyfin/library';
@@ -349,12 +350,21 @@ function Action({ kind, details, status, onFocus }: { kind: MediaKind; details: 
             disabled={!id || retry.isPending}
             onPress={() => id && retry.mutate(id)}
           />
+          <RemoveRequestButton kind={kind} tmdbId={details.tmdbId ?? details.id} title={details.title} onFocus={onFocus} />
         </View>
       );
     }
 
     default:
-      return <Progress status={status} />;
+      return (
+        <View style={{ gap: spacing.md, alignItems: 'flex-start' }}>
+          <Progress status={status} />
+          {/* Once it's downloaded there's nothing left to call off. */}
+          {status.state !== 'indexing' ? (
+            <RemoveRequestButton kind={kind} tmdbId={details.tmdbId ?? details.id} title={details.title} onFocus={onFocus} />
+          ) : null}
+        </View>
+      );
   }
 }
 
@@ -371,7 +381,7 @@ function Progress({ status }: { status: MediaStatus }) {
           : '';
 
   return (
-    // No button while in flight; Back stays focusable, and Play takes focus when it appears.
+    // Play takes focus when it appears.
     <View accessible accessibilityLabel={label} style={{ gap: spacing.sm, width: '100%' }}>
       <Text variant="label" style={{ color: colors.highlight }}>
         {label}

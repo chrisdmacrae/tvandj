@@ -2,8 +2,8 @@
   {
     "guid": "7a1c6f2e-3b4d-4e8a-9f10-5c2d7e8b9a01",
     "name": "TV and J",
-    "description": "Household settings shared by the TV and J apps on every device.",
-    "overview": "Keeps settings that belong to the whole household (like the downloadarr address) on your Jellyfin server, so the TV and J apps share them across every device and user.",
+    "description": "Household settings shared by the TV and J apps on every device, and scrobbling to Last.fm, ListenBrainz and Trakt.",
+    "overview": "Keeps settings that belong to the whole household (like the downloadarr address) on your Jellyfin server, so the TV and J apps share them across every device and user. From 1.1, everyone can connect their own Last.fm, ListenBrainz and Trakt accounts in TV and J, and what they play in any Jellyfin app is scrobbled.",
     "owner": "chrisdmacrae",
     "category": "General",
     "versions": [

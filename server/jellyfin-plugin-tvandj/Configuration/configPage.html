@@ -12,13 +12,41 @@
                 <p>Household settings shared by the TV and J apps on every device and for every user. Change them from the apps' Settings as an administrator.</p>
                 <pre id="TvAndJSettings" style="white-space:pre-wrap;padding:1em;background:rgba(0,0,0,.2);border-radius:4px"></pre>
                 <p id="TvAndJUpdated" class="fieldDescription"></p>
+
+                <h2 class="sectionTitle" style="margin-top:2em">Scrobbling</h2>
+                <p>Everyone connects their own accounts in TV and J's Settings, and what they play in any Jellyfin app is scrobbled: music to Last.fm and ListenBrainz, movies and shows to Trakt. ListenBrainz works as is. Last.fm and Trakt need this server registered with them once: create the app, then paste its credentials here.</p>
+                <p class="fieldDescription">If the separate Last.fm, ListenBrainz or Trakt plugins are installed too, turn off scrobbling in one or the other, or plays count twice.</p>
+                <form id="TvAndJScrobblingForm">
+                    <h3>Last.fm</h3>
+                    <p class="fieldDescription">Create an API account at <a is="emby-linkbutton" class="button-link" href="https://www.last.fm/api/account/create" target="_blank" rel="noopener">last.fm/api/account/create</a>; the callback URL can stay empty.</p>
+                    <div class="inputContainer"><input is="emby-input" type="text" id="LastfmApiKey" label="API key" autocomplete="off"></div>
+                    <div class="inputContainer"><input is="emby-input" type="password" id="LastfmApiSecret" label="Shared secret" autocomplete="off"></div>
+                    <h3>Trakt</h3>
+                    <p class="fieldDescription">Create an app at <a is="emby-linkbutton" class="button-link" href="https://trakt.tv/oauth/applications/new" target="_blank" rel="noopener">trakt.tv/oauth/applications/new</a> with the redirect URI <code>urn:ietf:wg:oauth:2.0:oob</code>.</p>
+                    <div class="inputContainer"><input is="emby-input" type="text" id="TraktClientId" label="Client ID" autocomplete="off"></div>
+                    <div class="inputContainer"><input is="emby-input" type="password" id="TraktClientSecret" label="Client secret" autocomplete="off"></div>
+                    <button is="emby-button" type="submit" class="raised button-submit block"><span>Save</span></button>
+                </form>
             </div>
         </div>
         <script type="text/javascript">
             (function () {
                 var pluginId = '7a1c6f2e-3b4d-4e8a-9f10-5c2d7e8b9a01';
-                document.querySelector('#TvAndJConfigPage').addEventListener('pageshow', function () {
+                var keys = ['LastfmApiKey', 'LastfmApiSecret', 'TraktClientId', 'TraktClientSecret'];
+                var page = document.querySelector('#TvAndJConfigPage');
+                page.querySelector('#TvAndJScrobblingForm').addEventListener('submit', function (e) {
+                    e.preventDefault();
+                    Dashboard.showLoadingMsg();
+                    // Re-read first, so saving here never winds back household settings an app just changed.
                     ApiClient.getPluginConfiguration(pluginId).then(function (config) {
+                        keys.forEach(function (k) { config[k] = page.querySelector('#' + k).value.trim(); });
+                        return ApiClient.updatePluginConfiguration(pluginId, config);
+                    }).then(Dashboard.processPluginConfigurationUpdateResult);
+                    return false;
+                });
+                page.addEventListener('pageshow', function () {
+                    ApiClient.getPluginConfiguration(pluginId).then(function (config) {
+                        keys.forEach(function (k) { page.querySelector('#' + k).value = config[k] || ''; });
                         var text;
                         try { text = JSON.stringify(JSON.parse(config.SettingsJson || '{}'), null, 2); } catch (e) { text = config.SettingsJson; }
                         document.querySelector('#TvAndJSettings').textContent = text;

@@ -5,7 +5,7 @@ import type { DiscoverItem, MediaKind } from '@tv-and-j/core/downloadarr/client'
 import { downloadDisplay } from '@tv-and-j/core/downloadarr/display';
 import { useActiveDownload, useMediaStatus } from '@tv-and-j/core/downloadarr/hooks';
 import { imageGlow } from '../lib/glowColor';
-import { useSetGlow } from '../state/GlowContext';
+import { useSetGlow } from '@tv-and-j/core/state/GlowContext';
 import { useAuthedSession } from '@tv-and-j/core/state/SessionContext';
 
 // Shared with the web app; re-exported so existing imports keep working.

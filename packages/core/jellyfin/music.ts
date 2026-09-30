@@ -2,6 +2,7 @@ import type { Api } from '@jellyfin/sdk';
 import type { BaseItemDto, ItemFields } from '@jellyfin/sdk/lib/generated-client/models';
 import { getArtistApi, getInstantMixApi, getLibraryApi, getLyricApi, getPlaylistApi } from '@jellyfin/sdk/lib/utils/api';
 import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
+import { useCallback } from 'react';
 import { useAuthedSession } from '../state/SessionContext';
 
 const TRACK_FIELDS: ItemFields[] = ['MediaSources'];
@@ -162,6 +163,71 @@ export function useAlbumArtists(limit = PAGE_SIZE, enabled = true) {
     },
     getNextPageParam: (last) => (last.start + last.items.length < last.total ? last.start + last.items.length : undefined),
   });
+}
+
+/**
+ * How an album is matched across Jellyfin, downloadarr's recommendations and
+ * its requests, which spell titles slightly differently ("Kid A" vs "Kid A ",
+ * curly vs straight quotes): artist and title, lower-cased, letters and digits only.
+ */
+export function albumKey(artist: string, album: string) {
+  const norm = (s: string) => s.normalize('NFKD').toLowerCase().replace(/[^\p{L}\p{N}]+/gu, '');
+  return `album:${norm(artist)}|${norm(album)}`;
+}
+
+/**
+ * Albums in Jellyfin keyed by `mbrg:<MusicBrainz release group>` and by
+ * albumKey, so recommendations can tell what's already playable. Ids only.
+ */
+type AlbumIndex = Record<string, string>;
+
+function albumIndexQuery(api: Api, userId: string, refetchInterval: number | false) {
+  return {
+    queryKey: ['albumIndex', userId],
+    staleTime: 60_000,
+    refetchInterval,
+    queryFn: async (): Promise<AlbumIndex> => {
+      const { data } = await getLibraryApi(api).getItems({
+        userId,
+        recursive: true,
+        includeItemTypes: ['MusicAlbum'],
+        fields: ['ProviderIds'],
+        enableImages: false,
+        enableUserData: false,
+      });
+      const index: AlbumIndex = {};
+      for (const item of data.Items ?? []) {
+        if (!item.Id || !item.Name) continue;
+        const rg = item.ProviderIds?.MusicBrainzReleaseGroup;
+        if (rg) index[`mbrg:${rg}`] = item.Id;
+        for (const artist of [item.AlbumArtist, ...(item.AlbumArtists ?? []).map((a) => a.Name)]) {
+          if (artist) index[albumKey(artist, item.Name)] = item.Id;
+        }
+      }
+      return index;
+    },
+  };
+}
+
+/** The Jellyfin id of an album, by MusicBrainz release group or artist and title. */
+export function useJellyfinAlbumId(
+  album: { artistName: string; albumTitle: string; releaseGroupMbid?: string | null } | undefined,
+  refetchInterval: number | false = false,
+) {
+  const { api, auth } = useAuthedSession();
+  const mbid = album?.releaseGroupMbid;
+  const key = album ? albumKey(album.artistName, album.albumTitle) : undefined;
+  return useQuery({
+    ...albumIndexQuery(api, auth.userId, refetchInterval),
+    enabled: !!album,
+    select: useCallback((index: AlbumIndex) => (mbid && index[`mbrg:${mbid}`]) || (key ? index[key] : undefined), [mbid, key]),
+  }).data;
+}
+
+/** Every album key in the library, for filtering recommendations down to what isn't there. */
+export function useAlbumIndex() {
+  const { api, auth } = useAuthedSession();
+  return useQuery(albumIndexQuery(api, auth.userId, false));
 }
 
 export type LyricLine = { text: string; /** Seconds; undefined for unsynced lyrics. */ start?: number };

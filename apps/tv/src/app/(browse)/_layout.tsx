@@ -3,9 +3,10 @@ import { View } from 'react-native';
 import { IconButton, SearchIcon, SettingsIcon, TabBar, colors, spacing } from '@tv-and-j/design-system';
 import { FocusGlow } from '../../components/GlowScreen';
 import { NowPlayingButton } from '../../components/NowPlayingButton';
+import { OnAirButton } from '../../components/OnAirButton';
 import { UserSwitcher } from '../../components/UserSwitcher';
 import { useLibraryKinds } from '@tv-and-j/core/jellyfin/library';
-import { GlowProvider } from '../../state/GlowContext';
+import { GlowProvider } from '@tv-and-j/core/state/GlowContext';
 
 const TABS = [
   { key: '/', label: 'Home' },
@@ -40,6 +41,7 @@ function BrowseChrome() {
         trailing={
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
             <NowPlayingButton />
+            <OnAirButton />
             <IconButton accessibilityLabel="Search" icon={(color) => <SearchIcon color={color} />} onPress={() => router.push('/search')} />
             <IconButton
               accessibilityLabel="Settings"

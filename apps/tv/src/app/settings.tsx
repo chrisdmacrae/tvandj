@@ -14,6 +14,7 @@ import {
   spacing,
 } from '@tv-and-j/design-system';
 import type { SubtitlePlaybackMode } from '@jellyfin/sdk/lib/generated-client/models';
+import { ScrobblingAccounts } from '../components/ScrobblingAccounts';
 import { PinSetup } from '../components/PinSetup';
 import { Downloadarr, findDownloadarr, normalizeBaseUrl } from '@tv-and-j/core/downloadarr/client';
 import { isRestricted, ratingLimitLabel, useCurrentUser, useParentalRatings, useUpdateUserConfiguration } from '@tv-and-j/core/jellyfin/users';
@@ -284,6 +285,10 @@ export default function SettingsScreen() {
                 />
               ) : null}
             </View>
+          </Section>
+
+          <Section title="Scrobbling" description="Your own accounts: what you play, in any Jellyfin app, is added to them. Just for you, not the whole household.">
+            <ScrobblingAccounts />
           </Section>
 
           {/* The downloadarr connection is the TV's, so profiles with content limits can't change it. */}

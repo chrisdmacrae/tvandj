@@ -3,6 +3,7 @@ import type { Api, Jellyfin } from '@jellyfin/sdk';
 import { createContext, use, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { getJellyfin } from '../jellyfin/sdk';
 import type { ServerInfo } from '../jellyfin/servers';
+import { loadNetworkSettings } from '../network';
 import { secureStorage } from './secureStorage';
 
 const SERVER_KEY = 'tv-and-j/server';
@@ -67,6 +68,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
           AsyncStorage.getItem(SERVER_KEY),
           secureStorage.get(ACCOUNTS_KEY),
           secureStorage.get(LEGACY_AUTH_KEY),
+          loadNetworkSettings(),
         ]);
         setJellyfin(jf);
         setServer(rawServer ? JSON.parse(rawServer) : null);

@@ -3,6 +3,8 @@ import { useQueryClient } from '@tanstack/react-query';
 import type Hls from 'hls.js';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { report, resolveStream, type Stream, type StreamOptions } from '@tv-and-j/core/jellyfin/playback';
+import { forwardsCredentials } from '@tv-and-j/core/network';
+import { usePreview } from '@tv-and-j/core/state/PreviewPlayer';
 import { useAuthedSession } from '@tv-and-j/core/state/SessionContext';
 import type { PlaybackControls } from '@tv-and-j/player/types';
 
@@ -22,6 +24,9 @@ export function useWebPlayback(item: BaseItemDto | undefined, options: { startAt
 } {
   const { api, auth } = useAuthedSession();
   const queryClient = useQueryClient();
+  // A preview or radio station playing on would talk over this.
+  const stopPreview = usePreview().stop;
+  useEffect(() => stopPreview(), [stopPreview]);
   const [video, setVideo] = useState<HTMLVideoElement | null>(null);
   const [stream, setStream] = useState<Stream | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -70,7 +75,11 @@ export function useWebPlayback(item: BaseItemDto | undefined, options: { startAt
       import('hls.js').then(({ default: HlsJs }) => {
         if (cancelled) return;
         if (!HlsJs.isSupported()) return setError('This browser can’t play this stream.');
-        hls = new HlsJs({ startPosition: stream.startSeconds || -1 });
+        hls = new HlsJs({
+          startPosition: stream.startSeconds || -1,
+          // Behind a sign-in proxy (Cloudflare Access), playlists and segments need its cookie too.
+          xhrSetup: forwardsCredentials() ? (xhr) => void (xhr.withCredentials = true) : undefined,
+        });
         hls.on(HlsJs.Events.ERROR, (_, data) => data.fatal && setError('Playback stopped. Check your connection and try again.'));
         hls.on(HlsJs.Events.MANIFEST_PARSED, () => {
           if (hls) {

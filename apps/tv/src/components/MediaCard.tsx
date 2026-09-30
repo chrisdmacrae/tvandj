@@ -5,7 +5,7 @@ import { PosterCard, type ArtworkShape } from '@tv-and-j/design-system';
 import { useActiveDownload } from '@tv-and-j/core/downloadarr/hooks';
 import { landscapeUrl, posterUrl } from '@tv-and-j/core/jellyfin/images';
 import { itemGlow } from '../lib/glowColor';
-import { useSetGlow } from '../state/GlowContext';
+import { useSetGlow } from '@tv-and-j/core/state/GlowContext';
 import { useMusic } from '../music/MusicPlayer';
 import { useAuthedSession } from '@tv-and-j/core/state/SessionContext';
 import { downloadDisplay } from './DiscoverCard';

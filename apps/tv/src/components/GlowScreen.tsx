@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react';
 import { View } from 'react-native';
 import { AmbientGlow, colors } from '@tv-and-j/design-system';
-import { GlowProvider, useGlowColor } from '../state/GlowContext';
+import { GlowProvider, useGlowColor } from '@tv-and-j/core/state/GlowContext';
 
 /** Glow from the top edge in the focused card's colour; stays on the last one when focus moves off the cards. */
 export function FocusGlow() {

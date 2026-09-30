@@ -2,6 +2,8 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { View } from 'react-native';
 import { Button, Text, spacing } from '@tv-and-j/design-system';
 import { DeleteButton } from '../../components/DeleteButton';
+import { tuneIn } from '../../lib/radio';
+import { useDownloadarr } from '@tv-and-j/core/downloadarr/hooks';
 import { MusicCollection } from '../../components/MusicCollection';
 import { posterUrl } from '@tv-and-j/core/jellyfin/images';
 import { useItem } from '@tv-and-j/core/jellyfin/library';
@@ -17,6 +19,8 @@ export default function Album() {
   const album = useItem(id).data;
   const tracks = useAlbumTracks(id).data;
   const artist = album?.AlbumArtists?.[0];
+  // downloadarr's artist radio: music like this that isn't in the library yet.
+  const radioArtist = useDownloadarr() ? (artist?.Name ?? album?.AlbumArtist ?? undefined) : undefined;
   const minutes = album?.RunTimeTicks ? Math.round(album.RunTimeTicks / 600_000_000) : undefined;
   const meta = [album?.ProductionYear, tracks ? `${tracks.length} song${tracks.length === 1 ? '' : 's'}` : undefined, minutes ? `${minutes} min` : trackLength(album?.RunTimeTicks)]
     .filter(Boolean)
@@ -42,7 +46,12 @@ export default function Album() {
           ) : null}
         </View>
       }
-      actions={<DeleteButton item={album} onDeleted={goBack} />}
+      actions={
+        <>
+          {radioArtist ? <Button label="Artist radio" size="md" variant="secondary" onPress={() => tuneIn(radioArtist)} /> : null}
+          <DeleteButton item={album} onDeleted={goBack} />
+        </>
+      }
     />
   );
 }

@@ -13,8 +13,8 @@ import { useAlbumArtists } from '@tv-and-j/core/jellyfin/music';
 type Kind = 'movies' | 'tv' | 'collections' | 'mylist' | 'albums' | 'artists';
 
 const KINDS: Record<Kind, { title: string; types: BaseItemKind[]; sort: GridSort; filters: boolean; empty: string }> = {
-  movies: { title: 'All movies', types: ['Movie'], sort: 'added', filters: true, empty: 'No movies match.' },
-  tv: { title: 'All shows', types: ['Series'], sort: 'added', filters: true, empty: 'No shows match.' },
+  movies: { title: 'Downloaded movies', types: ['Movie'], sort: 'added', filters: true, empty: 'No movies match.' },
+  tv: { title: 'Downloaded shows', types: ['Series'], sort: 'added', filters: true, empty: 'No shows match.' },
   collections: { title: 'Collections', types: ['BoxSet'], sort: 'name', filters: false, empty: 'No collections yet.' },
   albums: { title: 'All albums', types: ['MusicAlbum'], sort: 'name', filters: false, empty: 'No albums yet.' },
   // Artists come from Jellyfin's album-artist list, not an item query (see below).

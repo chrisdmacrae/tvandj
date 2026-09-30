@@ -5,6 +5,7 @@
  * Routes have no prefix on the API port (3001); behind its web UI they
  * live under /api.
  */
+import { requestCredentials } from '../network';
 import { discoverDownloadarr } from '../platform';
 import type { Codec, Language, Quality, Settings } from '../state/SettingsContext';
 
@@ -73,8 +74,13 @@ export type RequestStatus = 'PENDING' | 'SEARCHING' | 'FOUND' | 'DOWNLOADING' | 
 
 export type TorrentRequest = {
   id: string;
-  contentType: 'MOVIE' | 'TV_SHOW' | 'GAME';
+  contentType: 'MOVIE' | 'TV_SHOW' | 'GAME' | 'MUSIC';
+  /** For music, the album. */
   title: string;
+  /** Music only: the album artist. */
+  artist?: string;
+  /** Music only: the MusicBrainz release group. */
+  musicbrainzId?: string;
   year?: number;
   tmdbId?: number;
   imdbId?: string;
@@ -95,6 +101,100 @@ export type RequestSeason = {
   status: PieceStatus;
   episodes?: { id: string; episodeNumber: number; title?: string; status: PieceStatus }[];
   torrentDownloads?: { status: string; downloadProgress?: number }[];
+};
+
+/** The recommendation lists downloadarr builds from your listening history (ListenBrainz, Last.fm, Deezer, Spotify). */
+export type MusicList =
+  | 'NEW_ARTISTS'
+  | 'FRESH_RELEASES'
+  | 'WEEKLY_PICKS'
+  | 'WEEKLY_JAMS'
+  | 'DAILY_JAMS'
+  | 'FLOW'
+  | 'MOST_PLAYED'
+  | 'SAVED_ALBUMS';
+
+/** An album downloadarr recommends. */
+export type MusicRecommendation = {
+  id: string;
+  list: MusicList;
+  rank: number;
+  artistName: string;
+  artistMbid: string | null;
+  albumTitle: string;
+  releaseGroupMbid: string | null;
+  /** YYYY-MM-DD, or less precise. */
+  releaseDate: string | null;
+  coverUrl: string | null;
+  score: number;
+  /** Artists you listen to that led here, strongest first. */
+  reasons: string[];
+  sources: string[];
+};
+
+export type MusicDiscover = {
+  /** Lists with nothing in them may be missing, e.g. FLOW without Deezer. */
+  lists: Partial<Record<MusicList, MusicRecommendation[]>>;
+  topArtists: { name: string; mbid: string | null; tasteWeight: number }[];
+};
+
+/** An album as Deezer has it: its tracklist, with 30-second previews. */
+export type AlbumPreview = {
+  deezerAlbumId: number;
+  title: string;
+  artistName: string;
+  coverUrl?: string;
+  tracks: { id: number; title: string; artistName: string; durationSeconds: number; position?: number; previewUrl?: string }[];
+};
+
+/** A track on an artist radio station. */
+export type RadioTrack = {
+  id: string;
+  title: string;
+  artistName: string;
+  albumTitle?: string;
+  coverUrl?: string;
+  durationSeconds: number;
+  /** 30-second clip; signed and short-lived. */
+  previewUrl: string;
+  source: 'deezer' | 'listenbrainz';
+};
+
+/** An album heard on a station, to request. */
+export type RadioAlbum = {
+  id: string;
+  artistName: string;
+  albumTitle: string;
+  coverUrl?: string;
+  sources: string[];
+};
+
+/** Deezer's mix for an artist, plus LB Radio when ListenBrainz is connected. Built on request, never stored. */
+export type ArtistRadio = {
+  artistName: string;
+  sources: string[];
+  /** In play order. */
+  tracks: RadioTrack[];
+  /** The albums the tracks come from, first heard first. */
+  albums: RadioAlbum[];
+};
+
+/** A person in the household, as downloadarr knows them: each builds their own recommendations. */
+export type RecommendationProfile = { id: string; name: string };
+
+/** Movies or shows from a profile's Trakt account: its recommendations and its watchlist. */
+export type VideoRails = {
+  recommended: (DiscoverItem & { profiles: string[] })[];
+  watchlist: (DiscoverItem & { profiles: string[] })[];
+};
+
+/** What's needed to request an album; a recommendation has it all. */
+export type AlbumRef = {
+  artistName: string;
+  albumTitle: string;
+  releaseGroupMbid?: string | null;
+  releaseDate?: string | null;
+  coverUrl?: string | null;
 };
 
 export type DownloadStatus = {
@@ -159,7 +259,7 @@ export async function findDownloadarr(jellyfinAddress: string): Promise<string |
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), PROBE_TIMEOUT_MS);
     try {
-      const res = await fetch(`${url}/movies/genres/list`, { signal: controller.signal });
+      const res = await fetch(`${url}/movies/genres/list`, { signal: controller.signal, credentials: requestCredentials() });
       const body = (await res.json()) as { success?: boolean };
       if (res.ok && body.success) return url;
     } catch {
@@ -180,6 +280,7 @@ export class Downloadarr {
     try {
       res = await fetch(`${this.baseUrl}${path}`, {
         ...init,
+        credentials: requestCredentials(),
         headers: { Accept: 'application/json', 'Content-Type': 'application/json', ...init?.headers },
       });
     } catch {
@@ -225,7 +326,7 @@ export class Downloadarr {
   async requests(): Promise<TorrentRequest[]> {
     const all: TorrentRequest[] = [];
     for (let offset = 0; offset < 1000; offset += 100) {
-      const res = await fetch(`${this.baseUrl}/torrent-requests?limit=100&offset=${offset}`);
+      const res = await fetch(`${this.baseUrl}/torrent-requests?limit=100&offset=${offset}`, { credentials: requestCredentials() });
       const body = (await res.json()) as { success: boolean; data: TorrentRequest[]; pagination?: { hasMore: boolean } };
       if (!body.success) throw new DownloadarrError('Couldn’t load requests.');
       all.push(...body.data);
@@ -244,8 +345,59 @@ export class Downloadarr {
     return this.call<TorrentRequest>(`/torrent-requests/${requestId}/search`, { method: 'POST' });
   }
 
+  /** Delete a request outright; downloadarr cancels its download first if one is running. */
+  remove(requestId: string) {
+    return this.call<void>(`/torrent-requests/${requestId}`, { method: 'DELETE' });
+  }
+
   downloadStatus(requestId: string) {
     return this.call<DownloadStatus>(`/torrent-requests/${requestId}/download-status`);
+  }
+
+  /** The household's recommendation profiles. Newer downloadarr only. */
+  recommendationProfiles() {
+    return this.call<RecommendationProfile[]>('/recommendations/profiles');
+  }
+
+  /** Trakt recommendations and watchlist for one profile, or everyone's merged. Newer downloadarr only. */
+  videoRails(kind: MediaKind, profileId?: string) {
+    const query = profileId ? `?profileId=${encodeURIComponent(profileId)}` : '';
+    return this.call<VideoRails>(`/recommendations/${kind === 'movie' ? 'movies' : 'tv'}${query}`);
+  }
+
+  /** Album recommendations built from your listening history. Newer downloadarr only. */
+  musicDiscover() {
+    return this.call<MusicDiscover>('/music/discover');
+  }
+
+  /** An album's tracklist from Deezer; 404s when Deezer doesn't have it. */
+  albumPreview(artist: string, album: string) {
+    return this.call<AlbumPreview>(`/music/preview?artist=${encodeURIComponent(artist)}&album=${encodeURIComponent(album)}`);
+  }
+
+  /** An artist radio station; 404s when Deezer and ListenBrainz have nothing for the artist. Takes a few seconds. */
+  artistRadio(artist: string) {
+    return this.call<ArtistRadio>(`/music/radio?artist=${encodeURIComponent(artist)}`);
+  }
+
+  /** Stop recommending an album, or (without `album`) anything by the artist. */
+  dismissMusic(artist: string, album?: string) {
+    return this.call<unknown>('/music/dismissals', { method: 'POST', body: JSON.stringify({ artistName: artist, albumTitle: album }) });
+  }
+
+  /** Request an album. Video preferences don't apply; downloadarr ranks music releases by audio format itself. */
+  requestAlbum(album: AlbumRef) {
+    const year = Number(album.releaseDate?.slice(0, 4)) || undefined;
+    return this.call<TorrentRequest>('/torrent-requests/music', {
+      method: 'POST',
+      body: JSON.stringify({
+        title: album.albumTitle,
+        artist: album.artistName,
+        musicbrainzId: album.releaseGroupMbid ?? undefined,
+        year,
+        posterUrl: album.coverUrl ?? undefined,
+      }),
+    });
   }
 
   /**

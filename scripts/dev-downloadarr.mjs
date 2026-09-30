@@ -4,12 +4,18 @@
 // indexer or torrent client.
 //
 //   node scripts/dev-downloadarr.mjs     # needs scripts/dev-server.sh running
+//   PORT=3002 node scripts/dev-downloadarr.mjs
 //
 // - Serves the same routes and { success, data } shapes TV and J uses, on :3001.
 // - Titles and posters come from TMDB via the dev Jellyfin's remote search.
 // - Requests walk PENDING → SEARCHING → DOWNLOADING (0–100% over ~30s) →
 //   COMPLETED, then drop a generated video into the dev Jellyfin library so
 //   the app can be seen waiting for Jellyfin to index it before offering Play.
+// - Music discovery: made-up album recommendations (one, Night Drive, already in
+//   the dev library), weekly and daily jams, and artist radio; requested albums
+//   land as tagged MP3s in /media/music.
+// - Recommendation profiles: "dev" (matching the dev Jellyfin user), with Trakt
+//   recommendations and a watchlist for movies and shows from the catalogue.
 // - Answers "who is Downloadarr?" on udp/7360 like the real LAN discovery.
 import { execFile } from 'node:child_process';
 import dgram from 'node:dgram';
@@ -17,7 +23,8 @@ import { readFileSync } from 'node:fs';
 import http from 'node:http';
 import { promisify } from 'node:util';
 
-const PORT = 3001;
+// PORT=3002 runs it beside a real downloadarr.
+const PORT = Number(process.env.PORT ?? 3001);
 const JELLYFIN = 'http://localhost:8096';
 const CONTAINER = 'tvandj-jellyfin';
 const DOCKER = process.env.DOCKER ?? 'podman';
@@ -117,9 +124,51 @@ const MOCK_PEOPLE = [
   { id: '9004', name: 'D. Director', job: 'Director' },
 ];
 
+// ---- music -------------------------------------------------------------------
+
+const cover = (seed) => `https://picsum.photos/seed/${encodeURIComponent(seed)}/400`;
+let nextRecId = 1;
+const rec = (list, artistName, albumTitle, releaseDate, reasons = []) => ({
+  id: `rec_${nextRecId++}`,
+  list,
+  rank: nextRecId,
+  artistName,
+  artistMbid: null,
+  albumTitle,
+  releaseGroupMbid: null,
+  releaseDate,
+  coverUrl: cover(`${artistName}-${albumTitle}`),
+  score: 1,
+  reasons,
+  sources: ['listenbrainz'],
+  generatedAt: new Date().toISOString(),
+});
+let recommendations = [
+  rec('NEW_ARTISTS', 'Glass Harbour', 'Low Tide Radio', '2023-04-14', ['Test Artist']),
+  rec('NEW_ARTISTS', 'The Paper Moons', 'Stations', '2021-10-01', ['Test Artist', 'Glass Harbour']),
+  rec('NEW_ARTISTS', 'Mira Kova', 'Slow Signals', '2022-06-03', ['Test Artist']),
+  rec('FRESH_RELEASES', 'Test Artist', 'Night Drive II', '2026-09-12'),
+  rec('WEEKLY_PICKS', 'Oslo Static', 'Northern Lines', '2019-02-22'),
+  rec('WEEKLY_PICKS', 'Hollow Pines', 'Understory', '2020-08-08'),
+  rec('WEEKLY_JAMS', 'Glass Harbour', 'Tidewater', '2020-03-06'),
+  rec('DAILY_JAMS', 'Mira Kova', 'Paper Weather', '2024-11-15'),
+  rec('MOST_PLAYED', 'Test Artist', 'Night Drive', '2024-01-01'),
+];
+const dismissals = [];
+
+// Freely licensed sample MP3s stand in for Deezer's 30-second clips.
+const clip = (n) => `https://www.soundhelix.com/examples/mp3/SoundHelix-Song-${(n % 16) + 1}.mp3`;
+
+function musicLists() {
+  const lists = {};
+  for (const r of recommendations) (lists[r.list] ??= []).push(r);
+  return lists;
+}
+
 // ---- requests ----------------------------------------------------------------
 
 const requests = [];
+let nextRequestId = 1;
 const SEARCH_AFTER_MS = 3_000;
 const DOWNLOAD_AFTER_MS = 8_000;
 const DOWNLOAD_MS = 30_000;
@@ -139,7 +188,7 @@ function tick() {
     if (r.status === 'PENDING' && age > SEARCH_AFTER_MS) r.status = 'SEARCHING';
     if (r.status === 'SEARCHING' && age > DOWNLOAD_AFTER_MS) {
       r.status = 'DOWNLOADING';
-      r.foundTorrentTitle = `${r.title} (${r.year}) 1080p WEB-DL x265`;
+      r.foundTorrentTitle = r.contentType === 'MUSIC' ? `${r.artist} - ${r.title} (${r.year}) [FLAC]` : `${r.title} (${r.year}) 1080p WEB-DL x265`;
     }
     if (r.status === 'DOWNLOADING' && progressOf(r) >= 100) {
       r.status = 'COMPLETED';
@@ -155,6 +204,7 @@ function tick() {
 
 /** "Move into the library": generate a short video where Jellyfin will find it, then rescan. */
 async function organize(r) {
+  if (r.contentType === 'MUSIC') return organizeAlbum(r);
   const folder =
     r.contentType === 'MOVIE'
       ? `/media/movies/${r.title} (${r.year})`
@@ -163,6 +213,26 @@ async function organize(r) {
   const ff = `/usr/lib/jellyfin-ffmpeg/ffmpeg -loglevel error -y -f lavfi -i testsrc2=size=1280x720:rate=24 -f lavfi -i sine=frequency=500:sample_rate=48000 -t 120 -c:v libx264 -preset ultrafast -pix_fmt yuv420p -c:a aac -shortest`;
   try {
     await run(DOCKER, ['exec', CONTAINER, 'sh', '-c', `mkdir -p "${folder}" && ${ff} "${folder}/${file}"`]);
+    await jellyfin('/Library/Refresh', {});
+    console.log(`${r.title}: organized into ${folder}; Jellyfin rescanning`);
+  } catch (e) {
+    console.error(`${r.title}: organize failed`, e.message);
+  }
+}
+
+/** Three short tagged MP3s, like dev-server.sh's seeded album. */
+async function organizeAlbum(r) {
+  const folder = `/media/music/${r.artist}/${r.title}${r.year ? ` (${r.year})` : ''}`;
+  const tag = (s) => String(s).replace(/"/g, '');
+  const script = [1, 2, 3]
+    .map(
+      (i) =>
+        `/usr/lib/jellyfin-ffmpeg/ffmpeg -loglevel error -y -f lavfi -i sine=frequency=${150 * i + 100}:sample_rate=44100 -t 30 -c:a libmp3lame ` +
+        `-metadata title="Song ${i}" -metadata artist="${tag(r.artist)}" -metadata album_artist="${tag(r.artist)}" -metadata album="${tag(r.title)}" -metadata track=${i} ${r.year ? `-metadata date=${r.year}` : ''} "${folder}/0${i} - Song ${i}.mp3"`,
+    )
+    .join(' && ');
+  try {
+    await run(DOCKER, ['exec', CONTAINER, 'sh', '-c', `mkdir -p "${folder}" && ${script}`]);
     await jellyfin('/Library/Refresh', {});
     console.log(`${r.title}: organized into ${folder}; Jellyfin rescanning`);
   } catch (e) {
@@ -212,6 +282,83 @@ async function route(method, url, body) {
     return ok(catalogue[kind].filter((i) => i.title.toLowerCase().includes(q)).map(publicItem));
   }
 
+  if (path === '/music/discover' && method === 'GET') {
+    return ok({ lists: musicLists(), topArtists: [{ name: 'Test Artist', mbid: null, tasteWeight: 1 }] });
+  }
+
+  if (path === '/music/preview' && method === 'GET') {
+    const artist = url.searchParams.get('artist');
+    const album = url.searchParams.get('album');
+    if (!artist || !album) return fail(400, 'artist and album are required');
+    const tracks = Array.from({ length: 10 }, (_, i) => ({
+      id: i + 1,
+      title: `${album} ${['Intro', 'Part', 'Interlude', 'Reprise'][i % 4]} ${i + 1}`,
+      artistName: artist,
+      durationSeconds: 150 + ((i * 37) % 120),
+      position: i + 1,
+      previewUrl: clip(i),
+    }));
+    return ok({ deezerAlbumId: 1, title: album, artistName: artist, coverUrl: cover(`${artist}-${album}`), tracks });
+  }
+
+  // Artist radio: a made-up station mixing the artist with the recommended artists.
+  if (path === '/music/radio' && method === 'GET') {
+    const artist = url.searchParams.get('artist');
+    if (!artist) return fail(400, 'artist is required');
+    const albums = [{ artistName: artist, albumTitle: `${artist} Live` }, ...recommendations.filter((r) => r.artistName !== artist)].slice(0, 6);
+    const tracks = Array.from({ length: 12 }, (_, i) => {
+      const a = albums[i % albums.length];
+      return {
+        id: `deezer:${i}`,
+        title: `Radio Song ${i + 1}`,
+        artistName: a.artistName,
+        albumTitle: a.albumTitle,
+        coverUrl: cover(`${a.artistName}-${a.albumTitle}`),
+        durationSeconds: 200,
+        previewUrl: clip(i),
+        source: i % 3 ? 'deezer' : 'listenbrainz',
+      };
+    });
+    return ok({
+      artistName: artist,
+      sources: ['deezer', 'listenbrainz'],
+      tracks,
+      albums: albums.map((a) => ({ id: `radio:${a.artistName}|${a.albumTitle}`, artistName: a.artistName, albumTitle: a.albumTitle, coverUrl: cover(`${a.artistName}-${a.albumTitle}`), sources: ['deezer'] })),
+    });
+  }
+
+  if (path === '/music/dismissals' && method === 'POST') {
+    const key = body.albumTitle ? `${body.artistName}|${body.albumTitle}` : body.artistName;
+    const dismissal = { id: `dis_${dismissals.length + 1}`, key, label: body.albumTitle ? `${body.albumTitle} by ${body.artistName}` : body.artistName, createdAt: new Date().toISOString() };
+    dismissals.push(dismissal);
+    recommendations = recommendations.filter((r) => r.artistName !== body.artistName || (body.albumTitle && r.albumTitle !== body.albumTitle));
+    console.log(`not interested: ${dismissal.label}`);
+    return ok(dismissal);
+  }
+
+  if (path === '/torrent-requests/music' && method === 'POST') {
+    if (!body.artist) return fail(400, 'artist is required for music requests');
+    const same = (r) => r.contentType === 'MUSIC' && r.artist.toLowerCase() === body.artist.toLowerCase() && r.title.toLowerCase() === body.title.toLowerCase();
+    if (requests.some((r) => same(r) && !['CANCELLED', 'FAILED', 'EXPIRED'].includes(r.status))) {
+      return fail(409, `A request for "${body.title}" by ${body.artist} already exists`);
+    }
+    const now = new Date().toISOString();
+    const request = { id: `req_${nextRequestId++}`, contentType: 'MUSIC', ...body, status: 'PENDING', searchAttempts: 0, createdAt: now, updatedAt: now, startedAt: Date.now() };
+    requests.push(request);
+    console.log(`requested album ${body.artist} - ${body.title}`);
+    const { startedAt, ...shown } = request;
+    return { status: 201, body: { success: true, data: shown } };
+  }
+
+  if (path === '/recommendations/profiles' && method === 'GET') {
+    return ok([{ id: 'profile-dev', name: 'dev', createdAt: '2026-09-30T00:00:00.000Z' }]);
+  }
+
+  if ((m = path.match(/^\/recommendations\/(movies|tv)$/)) && method === 'GET') {
+    const items = catalogue[m[1] === 'movies' ? 'movie' : 'tv'].map((i) => ({ ...publicItem(i), profiles: ['dev'] }));
+    return ok({ recommended: items.filter((_, i) => i % 2 === 0), watchlist: items.filter((_, i) => i % 2 === 1) });
+  }
+
   if (path === '/torrent-requests' && method === 'GET') {
     const limit = Number(url.searchParams.get('limit') ?? 20);
     const offset = Number(url.searchParams.get('offset') ?? 0);
@@ -225,7 +372,7 @@ async function route(method, url, body) {
     if (dupe) return fail(409, 'This title has already been requested');
     const now = new Date().toISOString();
     const request = {
-      id: `req_${requests.length + 1}`,
+      id: `req_${nextRequestId++}`,
       contentType,
       ...body,
       status: 'PENDING',
@@ -285,6 +432,14 @@ async function route(method, url, body) {
     if (!r) return fail(404, 'Not found');
     Object.assign(r, { status: 'PENDING', startedAt: Date.now(), updatedAt: new Date().toISOString() });
     return ok(r);
+  }
+
+  if ((m = path.match(/^\/torrent-requests\/([^/]+)$/)) && method === 'DELETE') {
+    const i = requests.findIndex((x) => x.id === m[1]);
+    if (i < 0) return fail(404, 'Not found');
+    console.log(`removed ${requests[i].title}`);
+    requests.splice(i, 1);
+    return { status: 200, body: { success: true, message: 'Torrent request deleted successfully' } };
   }
 
   return fail(404, `No mock for ${method} ${path}`);

@@ -6,6 +6,8 @@ import { GlowScreen } from '../../components/GlowScreen';
 import { CardGrid } from '../../components/ItemGrid';
 import { MediaCard } from '../../components/MediaCard';
 import { PageHeader } from '../../components/PageHeader';
+import { tuneIn } from '../../lib/radio';
+import { useDownloadarr } from '@tv-and-j/core/downloadarr/hooks';
 import { posterUrl } from '@tv-and-j/core/jellyfin/images';
 import { useItem } from '@tv-and-j/core/jellyfin/library';
 import { fetchArtistSongs, fetchInstantMix, useArtistAlbums } from '@tv-and-j/core/jellyfin/music';
@@ -22,6 +24,7 @@ export default function Artist() {
   const artist = useItem(id).data;
   const albums = useArtistAlbums(id);
   const [busy, setBusy] = useState(false);
+  const radio = !!useDownloadarr();
   const name = artist?.Name ?? '';
 
   const start = async (load: () => Promise<Parameters<typeof music.playQueue>[0]>, shuffle = false) => {
@@ -62,6 +65,8 @@ export default function Artist() {
                   <Button label="Play all" size="md" hasTVPreferredFocus onPress={() => start(() => fetchArtistSongs(api, auth.userId, id))} />
                   <Button label="Shuffle" size="md" variant="secondary" onPress={() => start(() => fetchArtistSongs(api, auth.userId, id), true)} />
                   <Button label="Instant Mix" size="md" variant="secondary" onPress={() => start(() => fetchInstantMix(api, auth.userId, id))} />
+                  {/* downloadarr's radio: music like theirs that isn't in the library yet. */}
+                  {radio && name ? <Button label="Artist radio" size="md" variant="secondary" onPress={() => tuneIn(name)} /> : null}
                 </View>
               </View>
             </View>

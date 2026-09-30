@@ -1,9 +1,21 @@
 import { useMutation, useQueries, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useCallback, useMemo } from 'react';
 import { useJellyfinId, useLibraryIndex } from '../jellyfin/library';
+import { useAuthedSession } from '../state/SessionContext';
+import { albumKey, useAlbumIndex, useJellyfinAlbumId } from '../jellyfin/music';
 import { isRestricted, useCurrentUser } from '../jellyfin/users';
 import { useSettings } from '../state/SettingsContext';
-import { Downloadarr, type DiscoverDetails, type DiscoverItem, type MediaKind, type TorrentRequest } from './client';
+import {
+  Downloadarr,
+  type AlbumRef,
+  type ArtistRadio,
+  type DiscoverDetails,
+  type DiscoverItem,
+  type DownloadStatus,
+  type MediaKind,
+  type MusicDiscover,
+  type TorrentRequest,
+} from './client';
 import { showProgress, type TvProgress } from './tvStatus';
 
 const ACTIVE = new Set(['PENDING', 'SEARCHING', 'FOUND', 'DOWNLOADING']);
@@ -81,8 +93,9 @@ export function usePersonDetails(tmdbId: string) {
 export const requestKey = (kind: MediaKind, tmdbId: number | string) => `${kind}:${tmdbId}`;
 
 /**
- * Every downloadarr request indexed by kind + TMDB id (the API has no lookup
- * by id). Polls quickly while anything is in flight, slowly otherwise.
+ * Every downloadarr request indexed by kind + TMDB id, and albums by albumKey
+ * (the API has no lookup by id). Polls quickly while anything is in flight,
+ * slowly otherwise.
  */
 type RequestIndex = Record<string, TorrentRequest>;
 
@@ -95,8 +108,11 @@ function requestIndexQuery(client: Downloadarr | null) {
     queryFn: async (): Promise<RequestIndex> => {
       const index: RequestIndex = {};
       for (const r of await client!.requests()) {
-        if (r.tmdbId == null || r.contentType === 'GAME') continue;
-        const key = requestKey(r.contentType === 'MOVIE' ? 'movie' : 'tv', r.tmdbId);
+        let key: string;
+        if (r.contentType === 'MUSIC' && r.artist) key = albumKey(r.artist, r.title);
+        else if (r.tmdbId != null && (r.contentType === 'MOVIE' || r.contentType === 'TV_SHOW')) {
+          key = requestKey(r.contentType === 'MOVIE' ? 'movie' : 'tv', r.tmdbId);
+        } else continue;
         const existing = index[key];
         // Several requests can exist for one title (e.g. a re-request); the newest wins.
         if (!existing || existing.updatedAt < r.updatedAt) index[key] = r;
@@ -117,7 +133,15 @@ export function useRequestIndex() {
  * its own request changes, not every time the list is polled.
  */
 export function useRequestFor(kind: MediaKind, tmdbId: string | number | undefined) {
-  const key = tmdbId == null ? undefined : requestKey(kind, tmdbId);
+  return useRequestByKey(tmdbId == null ? undefined : requestKey(kind, tmdbId));
+}
+
+/** An album's request, matched on artist and title. */
+export function useAlbumRequest(album: AlbumRef | undefined) {
+  return useRequestByKey(album ? albumKey(album.artistName, album.albumTitle) : undefined);
+}
+
+function useRequestByKey(key: string | undefined) {
   return useQuery({
     ...requestIndexQuery(useDownloadarr()),
     select: useCallback((index: RequestIndex) => (key ? index[key] : undefined), [key]),
@@ -177,15 +201,19 @@ export function useMediaStatus(kind: MediaKind, tmdbId: string | number | undefi
 
   const show = kind === 'tv' ? showProgress(seasons ?? []) : null;
   if (show) return show.state === 'complete' ? { state: 'indexing' } : fromTv(show);
+  return requestState(request, progress.data);
+}
 
+/** Where a request stands on its own: a movie's or an album's. */
+function requestState(request: TorrentRequest, progress: DownloadStatus | undefined): MediaStatus {
   switch (request.status) {
     case 'COMPLETED':
       return { state: 'indexing' };
     case 'DOWNLOADING':
       return {
         state: 'downloading',
-        progress: progress.data ? progress.data.progress / 100 : null,
-        eta: progress.data?.eta && progress.data.eta !== '∞' ? progress.data.eta : undefined,
+        progress: progress ? progress.progress / 100 : null,
+        eta: progress?.eta && progress.eta !== '∞' ? progress.eta : undefined,
       };
     case 'FAILED':
     case 'EXPIRED':
@@ -236,6 +264,26 @@ export function useRetryRequest() {
   });
 }
 
+/**
+ * Take back a request: downloadarr stops searching, cancels any download in
+ * flight and forgets it. Dropped from the index straight away, so the title
+ * goes back to "Request" without waiting for the next poll.
+ */
+export function useRemoveRequest() {
+  const client = useDownloadarr();
+  const queryClient = useQueryClient();
+  const key = ['da', client?.baseUrl, 'requests'];
+  return useMutation({
+    mutationFn: (requestId: string) => client!.remove(requestId),
+    onSuccess: (_, requestId) => {
+      queryClient.setQueryData<RequestIndex>(key, (index) =>
+        index && Object.fromEntries(Object.entries(index).filter(([, r]) => r.id !== requestId)),
+      );
+      return queryClient.invalidateQueries({ queryKey: key });
+    },
+  });
+}
+
 export function useRequestMedia(kind: MediaKind) {
   const client = useDownloadarr();
   const { settings } = useSettings();
@@ -263,6 +311,7 @@ export function useRequestedItems(kind?: MediaKind): { item: DiscoverItem; kind:
   const candidates = useMemo(() => {
     const list: { request: TorrentRequest; kind: MediaKind; inLibrary: boolean }[] = [];
     for (const request of Object.values(requests.data ?? {})) {
+      if (request.contentType === 'MUSIC') continue;
       const k: MediaKind = request.contentType === 'MOVIE' ? 'movie' : 'tv';
       if ((kind && k !== kind) || !IN_FLIGHT.has(request.status) || request.tmdbId == null) continue;
       const inLibrary = !!library.data?.[requestKey(k, request.tmdbId)];
@@ -340,4 +389,176 @@ export function useNewForYou(limit = NEW_FOR_YOU_LIMIT) {
     }
     return mixed;
   }, [client, movies.data, shows.data, library.data, limit]);
+}
+
+// ---- music ---------------------------------------------------------------------
+
+/** downloadarr's album recommendations. An older downloadarr without music answers 404: no rows, no retries. */
+export function useMusicDiscover() {
+  return useQuery(musicDiscoverQuery(useDownloadarr()));
+}
+
+function musicDiscoverQuery(client: Downloadarr | null) {
+  return {
+    queryKey: ['da', client?.baseUrl, 'music', 'discover'],
+    enabled: !!client,
+    staleTime: 30 * 60 * 1000,
+    retry: false,
+    queryFn: () => client!.musicDiscover(),
+  };
+}
+
+/**
+ * An album's tracklist from Deezer, with 30-second preview clips, or null when
+ * Deezer doesn't have it. The clip addresses are signed and expire after about
+ * 15 minutes, so this goes stale well before that.
+ */
+export function useAlbumPreview(album: AlbumRef | undefined) {
+  const client = useDownloadarr();
+  return useQuery({
+    queryKey: ['da', client?.baseUrl, 'music', 'preview', album?.artistName, album?.albumTitle],
+    enabled: !!client && !!album,
+    staleTime: 10 * 60 * 1000,
+    retry: false,
+    queryFn: () => client!.albumPreview(album!.artistName, album!.albumTitle).catch(() => null),
+  });
+}
+
+/** Where an album stands across Jellyfin and downloadarr. Jellyfin wins, as with movies. */
+export function useAlbumStatus(album: AlbumRef | undefined): MediaStatus {
+  const request = useAlbumRequest(album);
+  // Downloaded but not yet in Jellyfin: poll the library until it appears.
+  const jellyfinId = useJellyfinAlbumId(album, request?.status === 'COMPLETED' ? 15_000 : false);
+  const progress = useDownloadProgress(request);
+  if (!album) return { state: 'none' };
+  if (jellyfinId) return { state: 'available', jellyfinId };
+  if (!request) return { state: 'none' };
+  return requestState(request, progress.data);
+}
+
+export function useRequestAlbum() {
+  const client = useDownloadarr();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (album: AlbumRef) => client!.requestAlbum(album),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['da', client?.baseUrl, 'requests'] }),
+  });
+}
+
+/**
+ * "Not interested": downloadarr stops recommending the album, or with
+ * `artist: true` anything by its artist. Gone from the rows straight away.
+ */
+export function useDismissMusic() {
+  const client = useDownloadarr();
+  const queryClient = useQueryClient();
+  const key = ['da', client?.baseUrl, 'music', 'discover'];
+  return useMutation({
+    mutationFn: ({ album, artist }: { album: AlbumRef; artist?: boolean }) =>
+      client!.dismissMusic(album.artistName, artist ? undefined : album.albumTitle),
+    onSuccess: (_, { album, artist }) => {
+      const hidden = (r: AlbumRef) =>
+        artist
+          ? albumKey(r.artistName, '') === albumKey(album.artistName, '')
+          : albumKey(r.artistName, r.albumTitle) === albumKey(album.artistName, album.albumTitle);
+      queryClient.setQueryData<MusicDiscover>(key, (data) =>
+        data && {
+          ...data,
+          lists: Object.fromEntries(Object.entries(data.lists).map(([list, albums]) => [list, albums?.filter((r) => !hidden(r))])),
+        },
+      );
+      return queryClient.invalidateQueries({ queryKey: key });
+    },
+  });
+}
+
+/** Albums you've asked downloadarr for that aren't in Jellyfin yet (or failed). Newest activity first. */
+export function useRequestedAlbums(): AlbumRef[] {
+  const requests = useRequestIndex();
+  const library = useAlbumIndex();
+  return useMemo(
+    () =>
+      Object.values(requests.data ?? {})
+        .filter((r) => r.contentType === 'MUSIC' && r.artist && IN_FLIGHT.has(r.status))
+        .filter((r) => !library.data?.[albumKey(r.artist!, r.title)] && !(r.musicbrainzId && library.data?.[`mbrg:${r.musicbrainzId}`]))
+        .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
+        .map((r) => ({
+          artistName: r.artist!,
+          albumTitle: r.title,
+          releaseGroupMbid: r.musicbrainzId,
+          releaseDate: r.year ? String(r.year) : null,
+          coverUrl: r.posterUrl,
+        })),
+    [requests.data, library.data],
+  );
+}
+
+/** The recommendation for an album, if it's in any list, for its reasons and cover. */
+export function useRecommendation(artist: string | undefined, album: string | undefined) {
+  const key = artist && album ? albumKey(artist, album) : undefined;
+  return useQuery({
+    ...musicDiscoverQuery(useDownloadarr()),
+    select: useCallback(
+      (data: MusicDiscover) =>
+        key ? Object.values(data.lists).flat().find((r) => r && albumKey(r.artistName, r.albumTitle) === key) : undefined,
+      [key],
+    ),
+  }).data;
+}
+
+/**
+ * An artist radio station. The clips expire, so a station is only reused for
+ * a few minutes; tuning in again builds a fresh one. Undefined artist: no station.
+ */
+export function useArtistRadio(artist: string | undefined) {
+  const client = useDownloadarr();
+  return useQuery<ArtistRadio>({
+    queryKey: ['da', client?.baseUrl, 'music', 'radio', artist],
+    enabled: !!client && !!artist,
+    staleTime: 10 * 60 * 1000,
+    gcTime: 10 * 60 * 1000,
+    retry: false,
+    queryFn: () => client!.artistRadio(artist!),
+  });
+}
+
+// ---- personal recommendations (Trakt) --------------------------------------------
+
+/**
+ * The downloadarr recommendation profile for whoever's signed in: the one named like
+ * their Jellyfin user. Null when none matches (or downloadarr has no profiles), and
+ * then recommendations are everyone's, merged.
+ */
+export function useRecommendationProfile() {
+  const client = useDownloadarr();
+  const { auth } = useAuthedSession();
+  const profiles = useQuery({
+    queryKey: ['da', client?.baseUrl, 'recommendation-profiles'],
+    enabled: !!client,
+    staleTime: 10 * 60 * 1000,
+    retry: false,
+    queryFn: () => client!.recommendationProfiles(),
+  });
+  const name = auth.userName.trim().toLowerCase();
+  return {
+    profile: profiles.data?.find((p) => p.name.trim().toLowerCase() === name) ?? null,
+    ready: !profiles.isPending,
+  };
+}
+
+/**
+ * Movies or shows recommended by Trakt, and the watchlist, for whoever's signed in.
+ * Empty without Trakt connected in downloadarr, or with a downloadarr too old to have them.
+ */
+export function useVideoRails(kind: MediaKind) {
+  const client = useDownloadarr();
+  const { profile, ready } = useRecommendationProfile();
+  const rails = useQuery({
+    queryKey: ['da', client?.baseUrl, 'video-rails', kind, profile?.id ?? 'everyone'],
+    enabled: !!client && ready,
+    staleTime: 30 * 60 * 1000,
+    retry: false,
+    queryFn: () => client!.videoRails(kind, profile?.id),
+  });
+  return { recommended: rails.data?.recommended ?? [], watchlist: rails.data?.watchlist ?? [], profile };
 }

@@ -4,6 +4,7 @@ import { createVideoPlayer, type VideoPlayer } from 'expo-video';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { audioCodecs } from '@tv-and-j/core/platform';
 import { report, resolveStream, stopTranscode, type Stream, type StreamOptions } from '@tv-and-j/core/jellyfin/playback';
+import { usePreview } from '@tv-and-j/core/state/PreviewPlayer';
 import { useAuthedSession } from '@tv-and-j/core/state/SessionContext';
 
 const PROGRESS_INTERVAL_MS = 10_000;
@@ -34,6 +35,11 @@ export function usePlayback(
   const active = options.active ?? true;
   const { api, auth } = useAuthedSession();
   const queryClient = useQueryClient();
+  // A preview or radio station playing on would talk over the video.
+  const stopPreview = usePreview().stop;
+  useEffect(() => {
+    if (active) stopPreview();
+  }, [active, stopPreview]);
 
   const [player, setPlayer] = useState<VideoPlayer | null>(null);
   const [index, setIndex] = useState(0);

@@ -73,7 +73,8 @@ export default function Profiles() {
   };
 
   const choose = (person: Person) => {
-    if (fromSwitcher && person.Id === auth.userId) return router.back();
+    // Straight from sign-in there's no screen to go back to.
+    if (fromSwitcher && person.Id === auth.userId) return router.canGoBack() ? router.back() : goHome();
     if (locked?.has(person.Id)) {
       setPin('');
       setPinError(undefined);

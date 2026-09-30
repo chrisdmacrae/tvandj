@@ -7,6 +7,8 @@ import { useItem } from '@tv-and-j/core/jellyfin/library';
 import { trackLength, useAlbumTracks } from '@tv-and-j/core/jellyfin/music';
 import { useAuthedSession } from '@tv-and-j/core/state/SessionContext';
 import { Page } from '../../components/Page';
+import { tuneIn } from '../../lib/radio';
+import { useDownloadarr } from '@tv-and-j/core/downloadarr/hooks';
 
 /** An album: artwork, details, and its songs. Playing a song queues the rest of the album after it. */
 export default function Album() {
@@ -21,6 +23,8 @@ export default function Album() {
     if (track?.Id) router.push({ pathname: '/watch/[id]', params: { id: track.Id, queue } });
   };
   const art = album ? posterUrl(api, album, 600) : undefined;
+  // downloadarr's artist radio: music like this that isn't in the library yet.
+  const radioArtist = useDownloadarr() ? (album?.AlbumArtists?.[0]?.Name ?? album?.AlbumArtist ?? undefined) : undefined;
   const size = isPhone ? 180 : 240;
 
   return (
@@ -35,8 +39,9 @@ export default function Album() {
               {album?.Name}
             </Text>
             <Text tone="secondary">{[album?.AlbumArtist, album?.ProductionYear].filter(Boolean).join(' · ')}</Text>
-            <View style={{ marginTop: spacing.sm }}>
+            <View style={{ marginTop: spacing.sm, flexDirection: 'row', gap: spacing.sm }}>
               <Button label="Play" disabled={!tracks.length} onPress={() => play(0)} />
+              {radioArtist ? <Button label="Artist radio" variant="secondary" onPress={() => tuneIn(radioArtist)} /> : null}
             </View>
           </View>
         </View>

@@ -3,12 +3,14 @@ import { router } from 'expo-router';
 import { useEffect, useState, type ReactNode } from 'react';
 import { View } from 'react-native';
 import { Button, Dropdown, SelectChip, Text, TextField, spacing, useLayout } from '@tv-and-j/design-system';
-import { Downloadarr, findDownloadarr, normalizeBaseUrl } from '@tv-and-j/core/downloadarr/client';
-import { CODECS, LANGUAGES, QUALITIES, downloadarrAddress } from '@tv-and-j/core/downloadarr/requestOptions';
+import { CODECS, LANGUAGES, QUALITIES } from '@tv-and-j/core/downloadarr/requestOptions';
 import { isRestricted, ratingLimitLabel, useCurrentUser, useParentalRatings, useUpdateUserConfiguration } from '@tv-and-j/core/jellyfin/users';
 import { useAuthedSession } from '@tv-and-j/core/state/SessionContext';
 import { useSettings, type Settings as AppSettings } from '@tv-and-j/core/state/SettingsContext';
+import { DownloadarrAddress } from '../components/DownloadarrAddress';
+import { ForwardCredentialsToggle } from '../components/ForwardCredentialsToggle';
 import { Page } from '../components/Page';
+import { ScrobblingAccounts } from '../components/ScrobblingAccounts';
 
 const TRACK_LANGUAGES = [
   { value: '', label: 'No preference' },
@@ -58,57 +60,13 @@ function Choices<T extends string>({ options, selected, onChange }: { options: {
   );
 }
 
-/** An https page can't talk to an http server: browsers block it. */
-const servedSecurely = typeof location !== 'undefined' && location.protocol === 'https:';
-
 /**
  * Where downloadarr is. With the TV and J plugin on the Jellyfin server, an
  * administrator sets it once for the whole household; otherwise it's just this device.
  */
 function DownloadarrSection() {
-  const { server } = useAuthedSession();
-  const { settings, update, householdAccess, downloadarrFromHousehold } = useSettings();
+  const { settings, householdAccess, downloadarrFromHousehold } = useSettings();
   const locked = householdAccess === 'read' && downloadarrFromHousehold;
-  const [address, setAddress] = useState(settings.downloadarrUrl ?? '');
-  const [message, setMessage] = useState<{ error?: boolean; text: string }>();
-  const [busy, setBusy] = useState(false);
-  useEffect(() => setAddress(settings.downloadarrUrl ?? ''), [settings.downloadarrUrl]);
-
-  // Not set up yet: look for downloadarr next to Jellyfin, and pre-fill it if it answers.
-  useEffect(() => {
-    if (settings.downloadarrUrl || locked) return;
-    let cancelled = false;
-    findDownloadarr(server.address).then((found) => {
-      if (cancelled || !found) return;
-      setAddress(found);
-      setMessage({ text: 'Found downloadarr next to your Jellyfin server. Press Connect to use it.' });
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, [settings.downloadarrUrl, locked, server.address]);
-
-  const connect = async () => {
-    if (!address.trim()) return setMessage({ error: true, text: 'Enter downloadarr’s address.' });
-    const url = downloadarrAddress(address, normalizeBaseUrl);
-    if (servedSecurely && url.startsWith('http://')) {
-      return setMessage({ error: true, text: 'This page is secure (https), so browsers won’t let it reach an http address. Use downloadarr’s https address.' });
-    }
-    setBusy(true);
-    setMessage(undefined);
-    try {
-      await new Downloadarr(url).ping();
-      await update({ downloadarrUrl: url });
-      setMessage({ text: 'Connected.' });
-    } catch {
-      setMessage({
-        error: true,
-        text: 'Couldn’t reach downloadarr there. Use its API address (usually port 3001), and make sure downloadarr allows this app’s address (FRONTEND_URL).',
-      });
-    } finally {
-      setBusy(false);
-    }
-  };
 
   const scope =
     householdAccess === 'write'
@@ -121,42 +79,7 @@ function DownloadarrSection() {
 
   return (
     <Section title="downloadarr" description={`Optional. Discover new movies and shows, request them, and follow their downloads. ${scope}`}>
-      {locked ? (
-        <Text tone="secondary">{settings.downloadarrUrl}</Text>
-      ) : (
-        <>
-          <TextField
-            label="Address"
-            placeholder={servedSecurely ? 'https://downloadarr.example.com' : '192.168.1.20:3001'}
-            value={address}
-            onChangeText={(text) => {
-              setAddress(text);
-              setMessage(undefined);
-            }}
-            onSubmitEditing={connect}
-            error={message?.error ? message.text : undefined}
-            hint={!message?.error ? (message?.text ?? (settings.downloadarrUrl ? `Connected to ${settings.downloadarrUrl}` : undefined)) : undefined}
-            autoCapitalize="none"
-            autoCorrect={false}
-            keyboardType="url"
-          />
-          <View style={{ flexDirection: 'row', gap: spacing.sm }}>
-            <Button label={busy ? 'Checking…' : 'Connect'} size="sm" disabled={busy} onPress={connect} />
-            {settings.downloadarrUrl ? (
-              <Button
-                label="Disconnect"
-                size="sm"
-                variant="ghost"
-                onPress={() => {
-                  update({ downloadarrUrl: null });
-                  setAddress('');
-                  setMessage(undefined);
-                }}
-              />
-            ) : null}
-          </View>
-        </>
-      )}
+      {locked ? <Text tone="secondary">{settings.downloadarrUrl}</Text> : <DownloadarrAddress />}
     </Section>
   );
 }
@@ -218,6 +141,10 @@ export default function Settings() {
           </View>
         </Section>
 
+        <Section title="Connection" description="Only for servers behind a sign-in page. Most setups leave this off.">
+          <ForwardCredentialsToggle />
+        </Section>
+
         <Section title="Languages" description="Saved to your Jellyfin account, so your other Jellyfin apps (and the TV) use them too.">
           {config ? (
             <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm }}>
@@ -236,6 +163,10 @@ export default function Settings() {
               onPress={() => update({ playback: { ...settings.playback, autoplayNext: !settings.playback.autoplayNext } })}
             />
           </View>
+        </Section>
+
+        <Section title="Scrobbling" description="Your own accounts: what you play, in any Jellyfin app, is added to them. Just for you, not the whole household.">
+          <ScrobblingAccounts />
         </Section>
 
         {/* downloadarr: not for profiles with content limits (its catalogue can't be filtered by rating). */}

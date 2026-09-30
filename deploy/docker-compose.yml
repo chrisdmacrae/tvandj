@@ -1,0 +1,46 @@
+# TV and J's web app (the PWA) on a Linux box. deploy/setup.sh writes deploy/.env and runs this;
+# to do it by hand: cp .env.example .env, edit, then `docker compose up -d` from this folder.
+#
+# - pwa:   the static app behind nginx (apps/pwa/Dockerfile). Prebuilt from GitHub Container
+#          Registry by default; set PWA_IMAGE=tvandj-pwa:local and PWA_PULL_POLICY=build to build
+#          this checkout instead.
+# - caddy: optional HTTPS in front of it, with a free Let's Encrypt certificate for DOMAIN
+#          (`--profile https`). Browsers only install the app, and only run its service worker,
+#          over HTTPS (or on localhost).
+name: tvandj
+
+services:
+  pwa:
+    image: ${PWA_IMAGE:-ghcr.io/chrisdmacrae/tvandj-pwa:latest}
+    pull_policy: ${PWA_PULL_POLICY:-missing}
+    build:
+      context: ..
+      dockerfile: apps/pwa/Dockerfile
+      args:
+        # Optional IMDb and Rotten Tomatoes ratings. Baked into the app, so anyone using it can read it.
+        EXPO_PUBLIC_OMDB_API_KEY: ${OMDB_API_KEY:-}
+    restart: unless-stopped
+    ports:
+      - "${HTTP_PORT:-8080}:80"
+
+  caddy:
+    profiles: [https]
+    image: caddy:2-alpine
+    restart: unless-stopped
+    depends_on: [pwa]
+    environment:
+      DOMAIN: ${DOMAIN:-}
+      ACME_EMAIL: ${ACME_EMAIL:-}
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      # Certificates live here; keep them across restarts to stay clear of Let's Encrypt's rate limits.
+      - caddy_data:/data
+      - caddy_config:/config
+
+volumes:
+  caddy_data:
+  caddy_config:

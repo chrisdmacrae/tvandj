@@ -5,7 +5,7 @@ import { useHasCollections } from '@tv-and-j/core/jellyfin/browse';
 import { useDownloadarr } from '@tv-and-j/core/downloadarr/hooks';
 import { useLibraryByGenre, useLibraryGenres } from '@tv-and-j/core/jellyfin/library';
 import { useBottomSpace } from '../lib/chrome';
-import { DiscoverRows } from './DiscoverRows';
+import { DiscoverRows, RecentlyAdded } from './DiscoverRows';
 import { ItemCard } from './ItemCard';
 import { SectionHeader } from './SectionHeader';
 
@@ -18,7 +18,7 @@ function LibraryLinks({ kind }: { kind: Kind }) {
   const open = (grid: string) => router.push({ pathname: '/library/[kind]', params: { kind: grid } });
   return (
     <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, paddingHorizontal: gutter, paddingBottom: spacing.lg }}>
-      <Button label={kind === 'movie' ? 'All movies' : 'All shows'} size="sm" variant="secondary" onPress={() => open(kind === 'movie' ? 'movies' : 'tv')} />
+      <Button label={kind === 'movie' ? 'Downloaded movies' : 'Downloaded shows'} size="sm" variant="secondary" onPress={() => open(kind === 'movie' ? 'movies' : 'tv')} />
       {kind === 'movie' && hasCollections ? <Button label="Collections" size="sm" variant="secondary" onPress={() => open('collections')} /> : null}
       <Button label="My List" size="sm" variant="secondary" onPress={() => open('mylist')} />
     </View>
@@ -31,7 +31,7 @@ function LibraryGenreRow({ kind, genre }: { kind: Kind; genre: string }) {
   return <Shelf title={genre} data={data} keyExtractor={(item) => item.Id ?? ''} renderItem={({ item }) => <ItemCard item={item} shape="portrait" />} />;
 }
 
-/** Without downloadarr: your library, a row per genre. */
+/** Without downloadarr: what's recently added, then your library, a row per genre. */
 function LibraryRows({ kind, header, bottomSpace }: { kind: Kind; header: React.ReactElement; bottomSpace: number }) {
   const { gutter } = useLayout();
   const genres = useLibraryGenres(kind);
@@ -45,6 +45,7 @@ function LibraryRows({ kind, header, bottomSpace }: { kind: Kind; header: React.
       ListHeaderComponent={
         <View>
           {header}
+          <RecentlyAdded kind={kind} />
           {genres.isPending ? <ActivityIndicator color={colors.accent} style={{ marginTop: spacing.xl }} /> : null}
           {!genres.isPending && !genres.data?.length ? (
             <Text tone="secondary" style={{ paddingHorizontal: gutter }}>
@@ -61,7 +62,8 @@ function LibraryRows({ kind, header, bottomSpace }: { kind: Kind; header: React.
 /**
  * Movies or TV, laid out like the TV app: links to the whole library, collections
  * and My List, then rows. With downloadarr, the rows are discovery (your requests,
- * popular, then genres); without it, your library by genre.
+ * Trakt's picks, recently added, popular, then genres); without it, recently added
+ * and your library by genre.
  */
 export function BrowseScreen({ kind }: { kind: Kind }) {
   const bottomSpace = useBottomSpace();

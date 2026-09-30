@@ -12,6 +12,7 @@ import { colors } from '@tv-and-j/design-system';
 import { AndroidTvHome } from '../components/AndroidTvHome';
 import { Screensaver } from '../components/Screensaver';
 import { MusicPlayerProvider } from '../music/MusicPlayer';
+import { PreviewPlayerProvider } from '../music/PreviewPlayer';
 import { RemoteControl } from '../remote/RemoteControl';
 import { SessionProvider, useSession } from '@tv-and-j/core/state/SessionContext';
 import { SettingsProvider } from '@tv-and-j/core/state/SettingsContext';
@@ -54,6 +55,7 @@ function RootStack() {
             <Stack.Screen name="(browse)" />
             <Stack.Screen name="item/[id]" options={{ animation: 'fade' }} />
             <Stack.Screen name="discover/[kind]/[tmdbId]" options={{ animation: 'fade' }} />
+            <Stack.Screen name="discover/album" options={{ animation: 'fade' }} />
             <Stack.Screen name="settings" options={{ animation: 'fade' }} />
             <Stack.Screen name="search" options={{ animation: 'fade' }} />
             <Stack.Screen name="library/[kind]" options={{ animation: 'fade' }} />
@@ -86,8 +88,11 @@ export default function RootLayout() {
           <SettingsProvider>
             {/* Always mounted, so music plays on across screens; idle until a profile is chosen. */}
             <MusicPlayerProvider>
-              <StatusBar hidden />
-              <RootStack />
+              {/* Deezer previews and artist radio: one clip at a time, app-wide, so a station plays on while you browse. */}
+              <PreviewPlayerProvider>
+                <StatusBar hidden />
+                <RootStack />
+              </PreviewPlayerProvider>
             </MusicPlayerProvider>
           </SettingsProvider>
         </SessionProvider>

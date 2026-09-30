@@ -7,8 +7,11 @@ import { DarkTheme, Stack, ThemeProvider } from 'expo-router';
 import { useEffect } from 'react';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { colors } from '@tv-and-j/design-system';
+import { PreviewProvider } from '@tv-and-j/core/state/PreviewPlayer';
 import { SessionProvider, useSession } from '@tv-and-j/core/state/SessionContext';
-import { SettingsProvider } from '@tv-and-j/core/state/SettingsContext';
+import { SettingsProvider, useSettings } from '@tv-and-j/core/state/SettingsContext';
+import { useArrowKeyNavigation } from '../lib/keyboardNav';
+import { createPreviewAudio } from '../lib/previewAudio';
 import { RemoteTargetProvider } from '../lib/remoteTarget';
 
 const theme = {
@@ -22,6 +25,7 @@ const queryClient = new QueryClient({
 
 function RootStack() {
   const { ready, auth, profileChosen } = useSession();
+  useArrowKeyNavigation();
   if (!ready) return null;
   return (
     <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.canvas }, animation: 'fade' }}>
@@ -34,10 +38,12 @@ function RootStack() {
         <Stack.Screen name="switch-user" />
         <Stack.Protected guard={profileChosen}>
           <Stack.Screen name="(tabs)" />
+          <Stack.Screen name="setup-downloadarr" />
           <Stack.Screen name="item/[id]" />
           <Stack.Screen name="album/[id]" />
           <Stack.Screen name="watch/[id]" />
           <Stack.Screen name="discover/[kind]/[tmdbId]" />
+          <Stack.Screen name="discover/album" />
           <Stack.Screen name="library/[kind]" />
           <Stack.Screen name="collection/[id]" />
           <Stack.Screen name="remote/[id]" />
@@ -65,7 +71,10 @@ export default function RootLayout() {
           <SessionProvider>
             <SettingsProvider>
               <RemoteTargetProvider>
-                <RootStack />
+                {/* Deezer previews and artist radio: one clip at a time, app-wide, so a station plays on while you browse. */}
+                <PreviewProvider createAudio={createPreviewAudio}>
+                  <RootStack />
+                </PreviewProvider>
               </RemoteTargetProvider>
             </SettingsProvider>
           </SessionProvider>

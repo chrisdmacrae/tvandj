@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import { Animated, Easing, StyleSheet, View, useWindowDimensions } from 'react-native';
 import Svg, { Defs, RadialGradient, Rect, Stop } from 'react-native-svg';
 import { motion } from '../tokens';
@@ -40,6 +40,8 @@ export function AmbientGlow({ color, reach = 0.6, intensity = 1 }: AmbientGlowPr
   const [layers, setLayers] = useState<[string | null, string | null]>([color, null]);
   const [front, setFront] = useState<0 | 1>(0);
   const mix = useRef(new Animated.Value(color ? 0 : 1)).current; // 0 = layer A, 1 = layer B
+  // Gradient ids are document-wide on the web, where stacked screens can each have a glow.
+  const uid = useId().replace(/[^a-zA-Z0-9]/g, '');
 
   const current = layers[front];
   useEffect(() => {
@@ -72,7 +74,7 @@ export function AmbientGlow({ color, reach = 0.6, intensity = 1 }: AmbientGlowPr
               opacity: mix.interpolate({ inputRange: [0, 1], outputRange: i === 0 ? [1, 0] : [0, 1] }),
             }}
           >
-            <GlowLayer color={c} width={width} height={height} id={`ambient-glow-${i}`} />
+            <GlowLayer color={c} width={width} height={height} id={`ambient-glow-${uid}-${i}`} />
           </Animated.View>
         ) : null,
       )}

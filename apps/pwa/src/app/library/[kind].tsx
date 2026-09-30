@@ -11,13 +11,13 @@ import { Page } from '../../components/Page';
 type Kind = 'movies' | 'tv' | 'collections' | 'mylist';
 
 const KINDS: Record<Kind, { title: string; types: BaseItemKind[]; sort: GridSort; filters: boolean; empty: string }> = {
-  movies: { title: 'All movies', types: ['Movie'], sort: 'added', filters: true, empty: 'No movies match.' },
-  tv: { title: 'All shows', types: ['Series'], sort: 'added', filters: true, empty: 'No shows match.' },
+  movies: { title: 'Downloaded movies', types: ['Movie'], sort: 'added', filters: true, empty: 'No movies match.' },
+  tv: { title: 'Downloaded shows', types: ['Series'], sort: 'added', filters: true, empty: 'No shows match.' },
   collections: { title: 'Collections', types: ['BoxSet'], sort: 'name', filters: false, empty: 'No collections yet.' },
   mylist: { title: 'My List', types: ['Movie', 'Series'], sort: 'added', filters: false, empty: 'Nothing in My List yet. Add movies and shows from their pages.' },
 };
 
-/** A whole library as a grid, with sorting and filters (the TV's "All movies" and friends). */
+/** A whole library as a grid, with sorting and filters (the TV's "Downloaded movies" and friends). */
 export default function LibraryGrid() {
   const { kind: param } = useLocalSearchParams<{ kind: string }>();
   const kind: Kind = param in KINDS ? (param as Kind) : 'movies';
@@ -38,7 +38,7 @@ export default function LibraryGrid() {
   const items = grid.data?.pages.flatMap((p) => p.items) ?? [];
 
   return (
-    <Page back title={config.title} scroll={false}>
+    <Page back title={config.title} scroll={false} glow>
       <ItemGrid
         items={items}
         loading={grid.isPending}

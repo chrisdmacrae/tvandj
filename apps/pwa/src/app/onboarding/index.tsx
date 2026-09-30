@@ -2,8 +2,10 @@ import { router } from 'expo-router';
 import { useState } from 'react';
 import { Button, Text, TextField } from '@tv-and-j/design-system';
 import { ServerConnectionError, connectToServer } from '@tv-and-j/core/jellyfin/servers';
+import { forwardsCredentials } from '@tv-and-j/core/network';
 import { useSession } from '@tv-and-j/core/state/SessionContext';
 import { AuthCard } from '../../components/AuthCard';
+import { ForwardCredentialsToggle } from '../../components/ForwardCredentialsToggle';
 
 /** An https page can't talk to an http server (browsers block it), so say so up front. */
 const servedSecurely = typeof location !== 'undefined' && location.protocol === 'https:';
@@ -26,7 +28,8 @@ export default function ServerStep() {
       await saveServer(await connectToServer(address));
       router.push('/onboarding/sign-in');
     } catch (e) {
-      setError(e instanceof ServerConnectionError ? e.message : 'Couldn’t reach that server. Check the address and try again.');
+      const message = e instanceof ServerConnectionError ? e.message : 'Couldn’t reach that server. Check the address and try again.';
+      setError(forwardsCredentials() ? `${message} If your Cloudflare Access sign-in has expired, open the server’s address in this browser to sign in again.` : message);
     } finally {
       setBusy(false);
     }
@@ -50,6 +53,7 @@ export default function ServerStep() {
         keyboardType="url"
         returnKeyType="go"
       />
+      <ForwardCredentialsToggle onChange={() => setError(undefined)} />
       <Button label={busy ? 'Connecting…' : 'Connect'} onPress={connect} disabled={busy} />
       {servedSecurely ? (
         <Text variant="caption" tone="tertiary">

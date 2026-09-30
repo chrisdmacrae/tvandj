@@ -25,6 +25,8 @@ export function Focusable({
   focusScale = focus.scale,
   onFocus,
   onBlur,
+  onHoverIn,
+  onHoverOut,
   ...rest
 }: FocusableProps) {
   // Keyboard/D-pad focus, or a mouse over it (web): both show the focused look.
@@ -50,13 +52,15 @@ export function Focusable({
         onBlur?.(e);
       }}
       // Pointer hover (web; never fires on TV or touch screens).
-      onHoverIn={() => {
+      onHoverIn={(e) => {
         setHovered(true);
         animateTo(focusScale);
+        onHoverIn?.(e);
       }}
-      onHoverOut={() => {
+      onHoverOut={(e) => {
         setHovered(false);
         if (!hasFocus) animateTo(1);
+        onHoverOut?.(e);
       }}
     >
       <Animated.View

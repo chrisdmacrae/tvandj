@@ -27,6 +27,20 @@
         "8083"
       ],
       "port": 8083
+    },
+    {
+      "name": "pwa-8084",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": [
+        "run",
+        "start",
+        "-w",
+        "@tv-and-j/pwa",
+        "--",
+        "--port",
+        "8084"
+      ],
+      "port": 8084
     }
   ]
 }

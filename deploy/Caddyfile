@@ -1,0 +1,8 @@
+# HTTPS for the PWA. Caddy gets and renews a Let's Encrypt certificate for DOMAIN by itself;
+# the domain's DNS must point at this box, and ports 80 and 443 must reach it.
+{$DOMAIN} {
+	# Let's Encrypt's account email: expiry notices go here.
+	tls {$ACME_EMAIL}
+	encode zstd gzip
+	reverse_proxy pwa:80
+}

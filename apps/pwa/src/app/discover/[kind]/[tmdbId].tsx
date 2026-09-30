@@ -19,6 +19,7 @@ import { useJellyfinSeries } from '@tv-and-j/core/jellyfin/library';
 import { useSettings, type Settings } from '@tv-and-j/core/state/SettingsContext';
 import { DiscoverCard } from '../../../components/DiscoverCard';
 import { Episodes } from '../../../components/Episodes';
+import { RemoveRequestButton } from '../../../components/RemoveRequestButton';
 import { goBack } from '../../../lib/nav';
 
 const QUALITY_LABEL = { '1080p': '1080p', '4k': '4K' } as const;
@@ -72,6 +73,7 @@ function Action({ kind, details, status }: { kind: MediaKind; details: DiscoverD
           Couldn’t find a download matching your settings.
         </Text>
         <Button label={retry.isPending ? 'Searching…' : 'Try again'} size="lg" disabled={!id || retry.isPending} onPress={() => id && retry.mutate(id)} />
+        <RemoveRequestButton kind={kind} tmdbId={details.tmdbId ?? details.id} title={details.title} />
       </View>
     );
   }
@@ -92,6 +94,12 @@ function Action({ kind, details, status }: { kind: MediaKind; details: DiscoverD
       <Text variant="caption" tone="tertiary">
         {status.state === 'indexing' ? 'It’ll be ready to play as soon as Jellyfin finds it.' : 'You can leave this page; it keeps going in the background.'}
       </Text>
+      {/* Once it's downloaded there's nothing left to call off. */}
+      {status.state !== 'indexing' ? (
+        <View style={{ alignItems: isPhone ? 'stretch' : 'flex-start', marginTop: spacing.xs }}>
+          <RemoveRequestButton kind={kind} tmdbId={details.tmdbId ?? details.id} title={details.title} />
+        </View>
+      ) : null}
     </View>
   );
 }

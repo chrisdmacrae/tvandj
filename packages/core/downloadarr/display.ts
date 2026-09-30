@@ -18,3 +18,10 @@ export function downloadDisplay(status: MediaStatus): { download?: number | null
       return {};
   }
 }
+
+/** Titles for the Trakt rails: someone's own, or the household's merged when no profile matches. Both apps use them. */
+export function videoRailTitles(profileName: string | undefined) {
+  return profileName
+    ? { recommended: `Recommended for ${profileName}`, watchlist: `${profileName}’s watchlist` }
+    : { recommended: 'Recommended for your household', watchlist: 'Your household’s watchlists' };
+}

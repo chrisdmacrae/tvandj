@@ -27,7 +27,7 @@ public class Plugin : BasePlugin<PluginConfiguration>, IHasWebPages
 
     public override Guid Id => Guid.Parse("7a1c6f2e-3b4d-4e8a-9f10-5c2d7e8b9a01");
 
-    public override string Description => "Household settings shared by the TV and J apps on every device.";
+    public override string Description => "Household settings shared by the TV and J apps on every device, and scrobbling to Last.fm, ListenBrainz and Trakt.";
 
     public IEnumerable<PluginPageInfo> GetPages() =>
     [

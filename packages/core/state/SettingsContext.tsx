@@ -17,6 +17,8 @@ export type Language = 'english' | 'french' | 'german' | 'spanish' | 'japanese';
 export type Settings = {
   /** Optional downloadarr integration; discovery and requests only appear when set. */
   downloadarrUrl: string | null;
+  /** Onboarding has asked whether this device uses downloadarr (answered either way). */
+  downloadarrAsked: boolean;
   request: {
     qualities: Quality[];
     codecs: Codec[];
@@ -38,6 +40,7 @@ export type Settings = {
 
 export const DEFAULT_SETTINGS: Settings = {
   downloadarrUrl: null,
+  downloadarrAsked: false,
   request: { qualities: ['1080p'], codecs: ['h264', 'hevc'], languages: ['english'] },
   playback: { autoSkipIntro: false, autoplayNext: true, trailers: true, themeMusic: true },
   screensaverMinutes: 3,
@@ -72,13 +75,14 @@ type ProfileSettings = {
   playback: Pick<Settings['playback'], 'autoSkipIntro' | 'autoplayNext' | 'themeMusic'>;
 };
 /** Per-TV: where downloadarr is, whether this device's web view can play trailers, and the screensaver. */
-type DeviceSettings = { downloadarrUrl: Settings['downloadarrUrl']; trailers: boolean; screensaverMinutes: number };
+type DeviceSettings = { downloadarrUrl: Settings['downloadarrUrl']; downloadarrAsked: boolean; trailers: boolean; screensaverMinutes: number };
 
 const profileKey = (userId: string) => `${SETTINGS_KEY}/${userId}`;
 
 function combine(device: DeviceSettings, profile: ProfileSettings): Settings {
   return {
     downloadarrUrl: device.downloadarrUrl,
+    downloadarrAsked: device.downloadarrAsked,
     screensaverMinutes: device.screensaverMinutes,
     request: profile.request,
     playback: { ...profile.playback, trailers: device.trailers },
@@ -88,7 +92,7 @@ function combine(device: DeviceSettings, profile: ProfileSettings): Settings {
 function split(settings: Settings): { device: DeviceSettings; profile: ProfileSettings } {
   const { trailers, ...playback } = settings.playback;
   return {
-    device: { downloadarrUrl: settings.downloadarrUrl, trailers, screensaverMinutes: settings.screensaverMinutes },
+    device: { downloadarrUrl: settings.downloadarrUrl, downloadarrAsked: settings.downloadarrAsked, trailers, screensaverMinutes: settings.screensaverMinutes },
     profile: { request: settings.request, playback },
   };
 }
@@ -186,7 +190,8 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
     ])
       .then(([rawDevice, rawProfile, trailerCrashed]) => {
         if (cancelled) return;
-        const device = withDefaults(rawDevice ? JSON.parse(rawDevice) : {});
+        // Installs from before onboarding asked about downloadarr have had their chance in Settings.
+        const device = withDefaults(rawDevice ? { downloadarrAsked: true, ...JSON.parse(rawDevice) } : {});
         const storedProfile: StoredProfile | null = rawProfile ? JSON.parse(rawProfile) : null;
         const profile = storedProfile ? withDefaults(storedProfile) : device;
         updatedAt.current = storedProfile?.updatedAt ?? 0;

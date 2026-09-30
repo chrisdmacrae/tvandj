@@ -11,7 +11,7 @@ export default function Collection() {
   const collection = useItem(id).data;
   const grid = useItemGrid({ types: ['Movie', 'Series'], parentId: id, sort: 'release' });
   return (
-    <Page back title={collection?.Name ?? ''} scroll={false}>
+    <Page back title={collection?.Name ?? ''} scroll={false} glow>
       <ItemGrid
         items={grid.data?.pages.flatMap((p) => p.items) ?? []}
         loading={grid.isPending}

@@ -24,6 +24,28 @@ npm run android:tv -- -d <deviceName>
 
 `npm run design:preview` serves the design-system preview cards locally.
 
+## Hosting the web app
+
+`deploy/` runs the PWA on a Linux box with Docker: nginx serving the app, plus optional HTTPS
+through Caddy with a Let's Encrypt certificate.
+
+```sh
+git clone https://github.com/chrisdmacrae/tvandj.git && cd tvandj
+deploy/setup.sh              # asks for a port, an optional domain, prebuilt or build
+deploy/setup.sh update       # newest image (or rebuild), restart
+deploy/setup.sh stop | logs | status
+```
+
+- **Prebuilt** (default) pulls `ghcr.io/chrisdmacrae/tvandj-pwa:latest`, built by CI for amd64 and arm64.
+  **Build** builds your checkout instead (needs ~3.5 GB of memory), and is the only way to bake in an OMDb key.
+- **HTTPS** needs a domain pointing at the box, ports 80 and 443 open, and an email for Let's Encrypt.
+  Browsers only install the app and run its service worker over HTTPS. Over HTTPS the app can only
+  reach a Jellyfin (and downloadarr) that's on HTTPS too.
+- It installs Docker for you (after asking) if it's missing, and uses `sudo` if you aren't in the docker group.
+  `--yes` with `--port`, `--domain`, `--email`, `--build` runs it without questions.
+
+Settings are saved in `deploy/.env` (see `deploy/.env.example`); `docker compose` in `deploy/` works directly too.
+
 ## Local Jellyfin for development
 
 ```sh
@@ -47,7 +69,7 @@ EXPO_PUBLIC_OMDB_API_KEY=your-key
 ## downloadarr (optional)
 
 TV and J works with Jellyfin alone. Connecting [downloadarr](https://github.com/chrisdmacrae/downloadarr)
-in **Settings** adds:
+(the web app asks once, right after sign-in; after that it's in **Settings**) adds:
 
 - **New for you** on Home, and discovery rows by genre on the Movies and TV tabs
 - a **Request** button for titles not in Jellyfin, using the quality, codec and language chosen in Settings
@@ -64,3 +86,18 @@ node scripts/dev-downloadarr.mjs   # mock API on :3001 (emulator: 10.0.2.2:3001)
 ```
 
 Requests to the mock "download" over ~40s, then drop a generated video into the dev Jellyfin library.
+
+## Cloudflare Access (web app)
+
+When Jellyfin and downloadarr sit behind Cloudflare Access (Zero Trust), turn on **Behind Cloudflare Access**
+when connecting, or later in Settings → Connection. The web app then sends the browser's `CF_Authorization`
+cookie with its requests to both, including video streams. For that to work:
+
+- Open the Jellyfin and downloadarr addresses in the same browser once, so Access signs you in to each.
+  Do it again whenever the Access session expires.
+- Each server must answer CORS with the web app's exact origin and `Access-Control-Allow-Credentials: true`.
+  Jellyfin's default `*` doesn't work with cookies: list the web app's address under `CorsHosts` in
+  Jellyfin's `network.xml`. For downloadarr, set `FRONTEND_URL` to the web app's address.
+- In the Access application, allow CORS preflight: enable **Bypass OPTIONS requests to origin**, or set
+  its CORS settings to allow the web app's origin with credentials.
+- If the web app is on another domain, set the Access cookie's SameSite attribute to None.
