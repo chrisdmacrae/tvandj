@@ -466,6 +466,8 @@ http
 
 dgram
   .createSocket({ type: 'udp4', reuseAddr: true })
+  // A real downloadarr may already answer on 7360; the mock just goes without LAN discovery then.
+  .on('error', (e) => console.log(`LAN discovery off: ${e.message}`))
   .on('message', function (msg, from) {
     if (msg.toString().trim().toLowerCase() !== 'who is downloadarr?') return;
     this.send(JSON.stringify({ Id: 'dev', Name: 'Downloadarr', Version: 'dev', Port: PORT }), from.port, from.address);
