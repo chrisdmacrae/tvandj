@@ -33,7 +33,7 @@ const MUSIC: Tab = { key: '/music', label: 'Music', icon: (c) => <MusicIcon colo
 const SEARCH: Tab = { key: '/search', label: 'Search', icon: (c) => <SearchIcon color={c} /> };
 
 /** Bottom navigation height before the home-indicator inset. */
-const BOTTOM_NAV = 58;
+const BOTTOM_NAV = 54;
 /** Room for the "Playing on…" bar while controlling another screen. */
 const REMOTE_BAR = 88;
 

@@ -321,13 +321,16 @@ body {
 .ds-pin__key.is-focused { background: var(--color-text-primary); color: var(--color-text-inverse); transform: scale(1.1); }
 .ds-pin__key--blank { visibility: hidden; }
 
-/* BottomNav — phone tabs along the bottom: icon over label; selected in accent */
-.ds-bottom-nav { display: flex; background: var(--color-surface); border-top: 1px solid var(--color-border); }
+/* BottomNav — phone tabs along the bottom: equal widths; icon over a small label; the selected icon on an accent pill */
+.ds-bottom-nav { display: flex; padding: var(--space-xs) 0; background: var(--color-surface); border-top: 1px solid var(--color-border); }
 .ds-bottom-nav__item {
-  flex: 1; display: flex; flex-direction: column; align-items: center; gap: var(--space-xxs);
-  padding: var(--space-sm) 0; color: var(--color-text-secondary);
-  font-size: var(--type-caption-size); line-height: var(--type-caption-line);
+  flex: 1; display: flex; flex-direction: column; align-items: center; gap: 2px;
+  padding: var(--space-xxs) 0; color: var(--color-text-secondary);
+  font-size: 11px; line-height: 14px; font-weight: 500;
 }
+.ds-bottom-nav__icon { width: 56px; height: 30px; border-radius: var(--radius-pill); display: grid; place-items: center; }
 .ds-bottom-nav__item svg { width: 20px; height: 20px; }
 .ds-bottom-nav__item.is-focused { color: var(--color-text-primary); }
-.ds-bottom-nav__item.is-selected { color: var(--color-accent-strong); }
+.ds-bottom-nav__item.is-focused .ds-bottom-nav__icon { background: var(--color-surface-raised); }
+.ds-bottom-nav__item.is-selected { color: var(--color-accent-strong); font-weight: 600; }
+.ds-bottom-nav__item.is-selected .ds-bottom-nav__icon { background: var(--color-accent-muted); }

@@ -1,0 +1,90 @@
+# Builds the TV app's release APK (for Fire TV / Android TV sideloading).
+# Every push to main that touches the app uploads it as a workflow artifact; push a tag like
+# tv-v1.0.5 to also attach it to a GitHub Release. The version comes from apps/tv/app.json.
+#
+# Signed with the Expo template's debug key, like local `expo run:android --variant release`
+# builds, so a CI build installs over one made on your machine and vice versa.
+name: Android APK
+
+on:
+  push:
+    branches: [main]
+    tags: ['tv-v*']
+    paths:
+      - 'apps/tv/**'
+      - 'packages/**'
+      - 'package.json'
+      - 'package-lock.json'
+      - '.github/workflows/android-apk.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: android-apk-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+          cache: gradle
+          cache-dependency-path: |
+            package-lock.json
+            apps/tv/app.json
+
+      - name: Install
+        run: npm ci --no-audit --no-fund
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Generate the Android project
+        working-directory: apps/tv
+        env:
+          EXPO_TV: 1
+        run: npx expo prebuild --platform android --clean --no-install
+
+      - name: Build
+        working-directory: apps/tv/android
+        env:
+          # Optional: IMDb and Rotten Tomatoes ratings. Baked into the app, so anyone with the APK can read it.
+          EXPO_PUBLIC_OMDB_API_KEY: ${{ secrets.OMDB_API_KEY }}
+          NODE_ENV: production
+        run: ./gradlew assembleRelease --no-daemon
+
+      - name: Name the APK
+        run: |
+          VERSION=$(node -p "require('./apps/tv/app.json').expo.version")
+          echo "APK=tv-and-j-$VERSION.apk" >> "$GITHUB_ENV"
+          echo "VERSION=$VERSION" >> "$GITHUB_ENV"
+          cp apps/tv/android/app/build/outputs/apk/release/app-release.apk "tv-and-j-$VERSION.apk"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.APK }}
+          path: ${{ env.APK }}
+          if-no-files-found: error
+
+      - name: Release
+        if: startsWith(github.ref, 'refs/tags/tv-v')
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if [ "${GITHUB_REF_NAME#tv-v}" != "$VERSION" ]; then
+            echo "::error::Tag $GITHUB_REF_NAME doesn't match apps/tv/app.json version $VERSION"; exit 1
+          fi
+          gh release create "$GITHUB_REF_NAME" "$APK" --title "TV and J $VERSION" --generate-notes

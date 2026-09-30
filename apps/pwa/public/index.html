@@ -17,9 +17,11 @@
     <meta name="color-scheme" content="dark" />
     <!-- The react-native-web reset, plus the app's dark canvas before any JS runs. -->
     <style id="expo-reset">
+      /* 100dvh, not 100%: with viewport-fit=cover, an iOS home-screen app measures 100% short (by about
+         the status bar's height), leaving the page showing under the tab bar. */
       html,
       body {
-        height: 100%;
+        height: 100dvh;
         background: #0b0d12;
         color: #f4f5f8;
       }
