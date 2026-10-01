@@ -50,7 +50,7 @@ export function DownloadarrAddress() {
     } catch {
       setMessage({
         error: true,
-        text: 'Couldn’t reach downloadarr there. Use its API address, including the port (usually 3001), and make sure downloadarr allows this app’s address (FRONTEND_URL).',
+        text: 'Couldn’t reach downloadarr there. Use its address, including the port (usually 3001), and make sure downloadarr allows this app’s address (CORS_ORIGINS).',
       });
     } finally {
       setBusy(false);

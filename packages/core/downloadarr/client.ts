@@ -2,8 +2,8 @@
  * Minimal client for downloadarr (github.com/chrisdmacrae/downloadarr), an
  * optional companion service: TMDB-backed discovery plus torrent requests.
  * It has no auth; every response is wrapped as { success, data, error }.
- * Routes have no prefix on the API port (3001); behind its web UI they
- * live under /api.
+ * One server (port 3001) serves its web UI and its API, whose routes all
+ * live under /api/v1.
  */
 import { requestCredentials } from '../network';
 import { discoverDownloadarr } from '../platform';
@@ -252,11 +252,19 @@ const LANGUAGE: Record<Language, string> = {
   japanese: 'JAPANESE',
 };
 
+/** Where downloadarr's routes live on its server. */
+const API_PATH = '/api/v1';
+
+/**
+ * downloadarr's address as the client keeps it: the server itself, without the
+ * API's path. An address typed or saved with /api or /api/v1 on the end (older
+ * downloadarr was reached at :3000/api) means the same server.
+ */
 export function normalizeBaseUrl(input: string): string {
   let url = input.trim().replace(/\/+$/, '');
   // The port is the user's to give: downloadarr may sit behind a proxy on 80/443.
   if (!/^https?:\/\//i.test(url)) url = `http://${url}`;
-  return url;
+  return url.replace(/\/api(\/v1)?$/i, '');
 }
 
 const PROBE_TIMEOUT_MS = 2500;
@@ -264,12 +272,12 @@ const PROBE_TIMEOUT_MS = 2500;
 /**
  * Find downloadarr without the user typing an address. First ask the LAN
  * (newer downloadarr answers UDP broadcasts on 7360); failing that, try the
- * Jellyfin host, since they usually run on the same machine, on the API port
- * and behind the web UI's /api proxy. Resolves with the first that answers.
+ * Jellyfin host on downloadarr's port, since they usually run on the same
+ * machine.
  */
 export async function findDownloadarr(jellyfinAddress: string): Promise<string | null> {
   const announced = await discoverDownloadarr().catch(() => null);
-  if (announced) return announced;
+  if (announced) return normalizeBaseUrl(announced);
 
   let host: string;
   try {
@@ -277,31 +285,36 @@ export async function findDownloadarr(jellyfinAddress: string): Promise<string |
   } catch {
     return null;
   }
-  const candidates = [`http://${host}:3001`, `http://${host}:3000/api`];
-  const attempts = candidates.map(async (url) => {
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), PROBE_TIMEOUT_MS);
-    try {
-      const res = await fetch(`${url}/movies/genres/list`, { signal: controller.signal, credentials: requestCredentials() });
-      const body = (await res.json()) as { success?: boolean };
-      if (res.ok && body.success) return url;
-    } catch {
-      // Not there.
-    } finally {
-      clearTimeout(timer);
-    }
-    throw new Error('no answer');
-  });
-  return Promise.any(attempts).catch(() => null);
+  const url = `http://${host}:3001`;
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), PROBE_TIMEOUT_MS);
+  try {
+    const res = await fetch(`${url}${API_PATH}/movies/genres/list`, { signal: controller.signal, credentials: requestCredentials() });
+    const body = (await res.json()) as { success?: boolean };
+    if (res.ok && body.success) return url;
+  } catch {
+    // Not there.
+  } finally {
+    clearTimeout(timer);
+  }
+  return null;
 }
 
 export class Downloadarr {
-  constructor(readonly baseUrl: string) {}
+  /** The server's address, without the API's path. */
+  readonly baseUrl: string;
+  private readonly apiUrl: string;
+
+  constructor(baseUrl: string) {
+    // A saved address may predate /api/v1 and end in /api.
+    this.baseUrl = normalizeBaseUrl(baseUrl);
+    this.apiUrl = `${this.baseUrl}${API_PATH}`;
+  }
 
   private async call<T>(path: string, init?: RequestInit): Promise<T> {
     let res: Response;
     try {
-      res = await fetch(`${this.baseUrl}${path}`, {
+      res = await fetch(`${this.apiUrl}${path}`, {
         ...init,
         credentials: requestCredentials(),
         headers: { Accept: 'application/json', 'Content-Type': 'application/json', ...init?.headers },
@@ -349,7 +362,7 @@ export class Downloadarr {
   async requests(): Promise<TorrentRequest[]> {
     const all: TorrentRequest[] = [];
     for (let offset = 0; offset < 1000; offset += 100) {
-      const res = await fetch(`${this.baseUrl}/torrent-requests?limit=100&offset=${offset}`, { credentials: requestCredentials() });
+      const res = await fetch(`${this.apiUrl}/torrent-requests?limit=100&offset=${offset}`, { credentials: requestCredentials() });
       const body = (await res.json()) as { success: boolean; data: TorrentRequest[]; pagination?: { hasMore: boolean } };
       if (!body.success) throw new DownloadarrError('Couldn’t load requests.');
       all.push(...body.data);

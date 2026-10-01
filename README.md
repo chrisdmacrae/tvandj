@@ -117,7 +117,8 @@ TV and J works with Jellyfin alone. Connecting [downloadarr](https://github.com/
 
 Settings finds downloadarr automatically: it listens for downloadarr's LAN broadcast (udp/7360,
 downloadarr ≥ the `feat: answer LAN discovery broadcasts` commit) and falls back to checking the Jellyfin
-host on ports 3001 and 3000/api.
+host on port 3001. It needs a downloadarr that serves its API under `/api/v1` (the one that also serves
+its web UI from port 3001); older ones, with the API at the top of port 3001, aren't found.
 
 For development without a real indexer or torrent client:
 
