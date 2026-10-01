@@ -6,7 +6,8 @@
 //   node scripts/dev-downloadarr.mjs     # needs scripts/dev-server.sh running
 //   PORT=3002 node scripts/dev-downloadarr.mjs
 //
-// - Serves the same routes and { success, data } shapes TV and J uses, on :3001.
+// - Serves the same routes and { success, data } shapes TV and J uses, under
+//   /api/v1 on :3001.
 // - Titles and posters come from TMDB via the dev Jellyfin's remote search.
 // - Requests walk PENDING → SEARCHING → DOWNLOADING (0–100% over ~30s) →
 //   COMPLETED, then drop a generated video into the dev Jellyfin library so
@@ -245,8 +246,12 @@ async function organizeAlbum(r) {
 const ok = (data, extra = {}) => ({ status: 200, body: { success: true, data, ...extra } });
 const fail = (status, error) => ({ status, body: { success: false, error } });
 
+// Where downloadarr's routes live on its server.
+const API_PATH = '/api/v1';
+
 async function route(method, url, body) {
-  const path = url.pathname;
+  if (!url.pathname.startsWith(`${API_PATH}/`)) return fail(404, 'Not found');
+  const path = url.pathname.slice(API_PATH.length);
   let m;
 
   if ((m = path.match(/^\/(movies|tv-shows)\/(popular|genres\/list|genres\/(\d+)|(\d+))$/)) && method === 'GET') {

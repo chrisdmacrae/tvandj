@@ -162,7 +162,7 @@ export default function SettingsScreen() {
     } catch {
       setCheck({
         state: 'error',
-        message: 'Couldn’t reach downloadarr there. Use its API address, including the port, e.g. 192.168.1.20:3001.',
+        message: 'Couldn’t reach downloadarr there. Use its address, including the port, e.g. 192.168.1.20:3001.',
       });
     }
   };
