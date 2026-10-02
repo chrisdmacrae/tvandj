@@ -1,0 +1,5 @@
+{
+  "static": "./dist",
+  "watch": ["packages"],
+  "routes": [{ "path": "/*", "to": "static", "fallback": "index.html" }]
+}
