@@ -171,6 +171,8 @@ const REQUESTED_LABEL: Record<string, string> = {
   PENDING: 'Requested',
   SEARCHING: 'Searching…',
   FOUND: 'Starting download…',
+  // Nothing to retry from here: the files are down, and downloadarr holds the request until they're moved.
+  ORGANIZE_FAILED: 'Downloaded, not in the library yet',
 };
 
 function fromTv(show: TvProgress): MediaStatus {
@@ -295,7 +297,7 @@ export function useRequestMedia(kind: MediaKind) {
   });
 }
 
-const IN_FLIGHT = new Set(['PENDING', 'SEARCHING', 'FOUND', 'DOWNLOADING', 'COMPLETED', 'FAILED', 'EXPIRED']);
+const IN_FLIGHT = new Set(['PENDING', 'SEARCHING', 'FOUND', 'DOWNLOADING', 'COMPLETED', 'FAILED', 'EXPIRED', 'ORGANIZE_FAILED']);
 
 /**
  * Titles you've asked downloadarr for that aren't simply watchable yet:

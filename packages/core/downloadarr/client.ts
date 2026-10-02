@@ -70,7 +70,8 @@ export type PersonDetails = {
 
 export type Genre = { id: number; name: string };
 
-export type RequestStatus = 'PENDING' | 'SEARCHING' | 'FOUND' | 'DOWNLOADING' | 'COMPLETED' | 'FAILED' | 'CANCELLED' | 'EXPIRED';
+/** ORGANIZE_FAILED: downloaded, but downloadarr couldn't move the files into the library; it waits there to be sorted out. */
+export type RequestStatus = 'PENDING' | 'SEARCHING' | 'FOUND' | 'DOWNLOADING' | 'COMPLETED' | 'FAILED' | 'CANCELLED' | 'EXPIRED' | 'ORGANIZE_FAILED';
 
 export type TorrentRequest = {
   id: string;
